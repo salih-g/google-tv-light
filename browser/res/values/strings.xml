@@ -40,4 +40,10 @@
     <string name="clear_history">Clear history</string>
     <string name="clear_cookies">Clear cookies and site data</string>
     <string name="done">Done</string>
+    <string name="setting_adblock">Block ads and trackers</string>
+    <string name="setting_desktop">Site version</string>
+    <string name="setting_engine">Search engine</string>
+    <string name="on">On</string>
+    <string name="off">Off</string>
+    <string name="about">About</string>
 </resources>

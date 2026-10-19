@@ -40,4 +40,10 @@
     <string name="clear_history">Geçmişi temizle</string>
     <string name="clear_cookies">Çerezleri ve site verilerini temizle</string>
     <string name="done">Tamam</string>
+    <string name="setting_adblock">Reklam ve izleyicileri engelle</string>
+    <string name="setting_desktop">Site sürümü</string>
+    <string name="setting_engine">Arama motoru</string>
+    <string name="on">Açık</string>
+    <string name="off">Kapalı</string>
+    <string name="about">Hakkında</string>
 </resources>

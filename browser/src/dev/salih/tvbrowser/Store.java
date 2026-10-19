@@ -1,6 +1,9 @@
 package dev.salih.tvbrowser;
 
 import android.content.Context;
+import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -21,7 +24,8 @@ final class Store {
         Entry(String title, String url) { this.title = title; this.url = url; this.time = System.currentTimeMillis(); }
     }
 
-    private final File dir;
+    private final File dir, icons;
+    final SharedPreferences prefs;
     final List<Entry> bookmarks = new ArrayList<>();
     final List<Entry> history = new ArrayList<>();   // newest first, capped
     final List<Entry> tabs = new ArrayList<>();      // records only; the live WebView is separate
@@ -29,7 +33,8 @@ final class Store {
     private static final int HISTORY_MAX = 200;
 
     Store(Context ctx, String[] defaultBookmarks) {
-        dir = ctx.getFilesDir();
+        dir = ctx.getFilesDir(); icons = new File(dir, "icons"); icons.mkdirs();
+        prefs = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE);
         load("bookmarks.json", bookmarks); load("history.json", history);
         JSONObject t = readObject("tabs.json");
         if (t != null) { fill(t.optJSONArray("tabs"), tabs); activeTab = t.optInt("active", 0); }
@@ -81,6 +86,21 @@ final class Store {
         try { if (mobile) o.put(host, true); else o.remove(host); } catch (JSONException ignored) { }
         write("sites.json", o);
     }
+
+    // ---- favicons, one PNG per host ----
+    File iconFile(String host) { return new File(icons, host.replaceAll("[^a-z0-9.-]", "_") + ".png"); }
+    boolean hasIcon(String host) { return iconFile(host).length() > 0; }
+    Bitmap icon(String host) { return hasIcon(host) ? BitmapFactory.decodeFile(iconFile(host).getPath()) : null; }
+    void saveIcon(String host, Bitmap bmp) {
+        if (host == null || bmp == null || bmp.getWidth() < 8) return;
+        try (FileOutputStream out = new FileOutputStream(iconFile(host))) { bmp.compress(Bitmap.CompressFormat.PNG, 100, out); } catch (IOException ignored) { }
+    }
+
+    // ---- settings ----
+    boolean adBlock() { return prefs.getBoolean("adblock", true); }
+    boolean desktopDefault() { return prefs.getBoolean("desktop", true); }
+    String searchEngine() { return prefs.getString("engine", "google"); }
+    void set(String key, Object v) { SharedPreferences.Editor e = prefs.edit(); if (v instanceof Boolean) e.putBoolean(key, (Boolean) v); else e.putString(key, String.valueOf(v)); e.apply(); }
 
     // ---- json plumbing ----
     private static JSONArray toArray(List<Entry> list) {

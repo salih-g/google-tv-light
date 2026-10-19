@@ -68,7 +68,8 @@ public class MainActivity extends Activity {
     private String navJs, cosmeticCss;
 
     // root layers, bottom to top
-    private FrameLayout root, wallLayer, webContainer, fullscreenContainer, startPanel, keyboardPanel, hudPanel;
+    private FrameLayout root, wallLayer, webContainer, fullscreenContainer, startPanel, keyboardPanel, hudPanel, overlayPanel;
+    private LinearLayout overlayBody; private TextView overlayTitle;
     private ImageView wallBack, wallFront, cursor;
     private LinearLayout topBar, hintRow, startHint;
     private View progress, topScrim;
@@ -192,7 +193,7 @@ public class MainActivity extends Activity {
         fullscreenContainer = new FrameLayout(this); fullscreenContainer.setBackgroundColor(Color.BLACK); fullscreenContainer.setVisibility(View.GONE);
         root.addView(fullscreenContainer, new FrameLayout.LayoutParams(full));
 
-        buildStart(); buildTopBar(); buildCursor(); buildKeyboard(); buildHud();
+        buildStart(); buildTopBar(); buildCursor(); buildKeyboard(); buildHud(); buildOverlay();
 
         toast = ui.text(13, false, Ui.TEXT); toast.setBackground(ui.rounded(0xBF0A0E1E, 16)); toast.setPadding(ui.dp(14), ui.dp(8), ui.dp(14), ui.dp(8)); toast.setVisibility(View.GONE);
         FrameLayout.LayoutParams tl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.END);
@@ -209,8 +210,8 @@ public class MainActivity extends Activity {
         LinearLayout search = ui.pill(R.drawable.ic_search, getString(R.string.search), false, true); search.setOnClickListener(v -> showKeyboard(false, null));
         LinearLayout marks = ui.pill(R.drawable.ic_bookmark, getString(R.string.bookmarks), false, true); marks.setOnClickListener(v -> bookmarksRow.getChildAt(0).requestFocus());
         LinearLayout hist = ui.pill(R.drawable.ic_history, getString(R.string.history), false, true); hist.setOnClickListener(v -> { if (recentRow.getChildCount() > 0) recentRow.getChildAt(0).requestFocus(); });
-        LinearLayout tabsPill = ui.pill(R.drawable.ic_tabs, getString(R.string.tabs), false, true); tabsPill.setOnClickListener(v -> showTabsMenu(v));
-        LinearLayout settings = ui.pill(R.drawable.ic_settings, getString(R.string.settings), false, true); settings.setOnClickListener(v -> showSettingsMenu(v));
+        LinearLayout tabsPill = ui.pill(R.drawable.ic_tabs, getString(R.string.tabs), false, true); tabsPill.setOnClickListener(v -> showTabs());
+        LinearLayout settings = ui.pill(R.drawable.ic_settings, getString(R.string.settings), false, true); settings.setOnClickListener(v -> showSettings());
         for (LinearLayout p : new LinearLayout[]{search, marks, hist, tabsPill}) { LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ui.dp(38)); lp.bottomMargin = ui.dp(14); rail.addView(p, lp); }
         View spacer = new View(this); rail.addView(spacer, new LinearLayout.LayoutParams(1, 0, 1f));
         rail.addView(settings, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ui.dp(38)));
@@ -273,8 +274,16 @@ public class MainActivity extends Activity {
         for (Store.Entry e : store.bookmarks) {
             LinearLayout cell = new LinearLayout(this); cell.setOrientation(LinearLayout.VERTICAL); cell.setGravity(Gravity.CENTER_HORIZONTAL); cell.setClipChildren(false);
             FrameLayout card = ui.card(w, h, colorFor(e.url));
-            TextView letter = ui.text(28, true, Ui.TEXT); letter.setText(initial(e)); letter.setGravity(Gravity.CENTER);
-            card.addView(letter, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            android.graphics.Bitmap ic = store.icon(host(e.url));
+            if (ic != null) {
+                ImageView iv = new ImageView(this); iv.setImageBitmap(ic); iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                iv.setBackground(ui.rounded(0xFFFFFFFF, 10)); iv.setPadding(ui.dp(6), ui.dp(6), ui.dp(6), ui.dp(6));
+                card.addView(iv, new FrameLayout.LayoutParams(ui.dp(44), ui.dp(44), Gravity.CENTER));
+            } else {
+                TextView letter = ui.text(28, true, Ui.TEXT); letter.setText(initial(e)); letter.setGravity(Gravity.CENTER);
+                card.addView(letter, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                fetchIcon(host(e.url));
+            }
             card.setOnClickListener(v -> openUrl(e.url, true));
             card.setOnLongClickListener(v -> { showBookmarkMenu(v, e); return true; });
             cell.addView(card, new LinearLayout.LayoutParams(w, h));
@@ -296,15 +305,37 @@ public class MainActivity extends Activity {
         for (Store.Entry e : store.history.subList(0, Math.min(8, store.history.size()))) {
             LinearLayout r = ui.pill(0, "", true, false);
             r.setPadding(ui.dp(10), 0, ui.dp(14), 0);
-            TextView fav = ui.text(11, true, Ui.TEXT); fav.setText(initial(e)); fav.setGravity(Gravity.CENTER); fav.setShadowLayer(0, 0, 0, 0);
-            fav.setBackground(ui.rounded(colorFor(e.url), 6)); fav.setWidth(ui.dp(22)); fav.setHeight(ui.dp(22));
-            r.addView(fav, 0, new LinearLayout.LayoutParams(ui.dp(22), ui.dp(22)));
+            android.graphics.Bitmap ic = store.icon(host(e.url));
+            if (ic != null) {
+                ImageView iv = new ImageView(this); iv.setImageBitmap(ic); iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                iv.setBackground(ui.rounded(0xFFFFFFFF, 5)); iv.setPadding(ui.dp(2), ui.dp(2), ui.dp(2), ui.dp(2));
+                r.addView(iv, 0, new LinearLayout.LayoutParams(ui.dp(22), ui.dp(22)));
+            } else {
+                TextView fav = ui.text(11, true, Ui.TEXT); fav.setText(initial(e)); fav.setGravity(Gravity.CENTER); fav.setShadowLayer(0, 0, 0, 0);
+                fav.setBackground(ui.rounded(colorFor(e.url), 6)); fav.setWidth(ui.dp(22)); fav.setHeight(ui.dp(22));
+                r.addView(fav, 0, new LinearLayout.LayoutParams(ui.dp(22), ui.dp(22)));
+            }
             TextView t = Ui.label(r); t.setText(shortUrl(e.url)); t.setMaxLines(1); t.setPadding(ui.dp(9), 0, 0, 0);
             r.setOnClickListener(v -> openUrl(e.url, true));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ui.dp(40)); lp.setMarginEnd(ui.dp(10));
             recentRow.addView(r, lp);
         }
         tabsText.setText(store.tabs.size() + " " + getString(R.string.tabs).toLowerCase(Locale.getDefault()));
+    }
+
+    private final java.util.Set<String> iconFetches = new java.util.HashSet<>();
+
+    /** Bookmarks never opened have no icon yet: fetch one from Google's favicon service (what Chrome's new tab page uses). */
+    private void fetchIcon(String h) {
+        if (h.isEmpty() || !iconFetches.add(h)) return;
+        new Thread(() -> {
+            try {
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL("https://www.google.com/s2/favicons?sz=64&domain=" + Uri.encode(h)).openConnection();
+                c.setConnectTimeout(4000); c.setReadTimeout(4000);
+                android.graphics.Bitmap b = android.graphics.BitmapFactory.decodeStream(c.getInputStream());
+                if (b != null && b.getWidth() > 16) { store.saveIcon(h, b); handler.post(() -> { if (screen == Screen.START) { View f = getCurrentFocus(); int idx = f == null ? -1 : bookmarksRow.indexOfChild(f.getParent() instanceof View ? (View) f.getParent() : f); fillStart(); if (idx >= 0 && idx < bookmarksRow.getChildCount()) ((ViewGroup) bookmarksRow.getChildAt(idx)).getChildAt(0).requestFocus(); } }); }
+            } catch (Exception ignored) { }
+        }, "favicon").start();
     }
 
     private static String host(String url) { try { String h = Uri.parse(url).getHost(); return h == null ? url : h.replaceFirst("^www\\.", ""); } catch (RuntimeException e) { return url; } }
@@ -329,7 +360,7 @@ public class MainActivity extends Activity {
         LinearLayout blocked = ui.pill(R.drawable.ic_shield, "", true, false); blockedText = Ui.label(blocked); blocked.setFocusable(false);
         LinearLayout mode = ui.pill(R.drawable.ic_pointer, getString(R.string.cursor_mode), true, false); modeText = Ui.label(mode); mode.setOnClickListener(v -> { toggleCursor(); hideTopBar(); });
         LinearLayout mark = ui.pill(R.drawable.ic_bookmark, "", true, true); mark.setOnClickListener(v -> toggleBookmark());
-        LinearLayout tabs = ui.pill(R.drawable.ic_tabs, "", true, false); tabs.setOnClickListener(v -> showTabsMenu(v));
+        LinearLayout tabs = ui.pill(R.drawable.ic_tabs, "", true, false); tabs.setOnClickListener(v -> showTabs());
         LinearLayout more = ui.pill(R.drawable.ic_settings, "", true, true); more.setOnClickListener(v -> showPageMenu(v));
         for (View v : new View[]{back, fwd, reload}) { LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ui.dp(36)); topBar.addView(v, lp); }
         topBar.addView(urlText, new LinearLayout.LayoutParams(0, ui.dp(36), 1f));
@@ -508,7 +539,9 @@ public class MainActivity extends Activity {
     private String toUrl(String text) {
         if (text.matches("^[a-z]+://.*")) return text;
         if (!text.contains(" ") && text.contains(".")) return "https://" + text;
-        return String.format(getString(R.string.search_url), Uri.encode(text));
+        String engine = store.searchEngine();
+        String tpl = engine.equals("duckduckgo") ? "https://duckduckgo.com/?q=%s" : engine.equals("bing") ? "https://www.bing.com/search?q=%s" : getString(R.string.search_url);
+        return String.format(tpl, Uri.encode(text));
     }
 
     private void buildHud() {
@@ -537,6 +570,108 @@ public class MainActivity extends Activity {
         FrameLayout.LayoutParams cl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
         cl.setMargins(ui.dp(56), 0, ui.dp(56), ui.dp(40)); hudPanel.addView(col, cl);
         root.addView(hudPanel, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    }
+
+    /** Full-screen frosted panel used by the tabs and settings screens. */
+    private void buildOverlay() {
+        overlayPanel = new FrameLayout(this); overlayPanel.setBackgroundColor(0xF2141C2E); overlayPanel.setVisibility(View.GONE);
+        LinearLayout col = new LinearLayout(this); col.setOrientation(LinearLayout.VERTICAL); col.setClipChildren(false);
+        col.setPadding(ui.dp(56), ui.dp(44), ui.dp(56), ui.dp(28));
+        overlayTitle = ui.text(22, true, Ui.TEXT); col.addView(overlayTitle);
+        overlayBody = new LinearLayout(this); overlayBody.setOrientation(LinearLayout.VERTICAL); overlayBody.setClipChildren(false);
+        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT); bl.topMargin = ui.dp(24);
+        col.addView(overlayBody, bl);
+        overlayPanel.addView(col, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        root.addView(overlayPanel, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    }
+
+    private boolean overlayShowing() { return overlayPanel.getVisibility() == View.VISIBLE; }
+
+    private void showOverlay(String title) {
+        overlayTitle.setText(title); overlayBody.removeAllViews();
+        if (screen == Screen.START) startPanel.setVisibility(View.INVISIBLE);
+        hideTopBar();
+        overlayPanel.setAlpha(0f); overlayPanel.setTranslationY(ui.dp(30)); overlayPanel.setVisibility(View.VISIBLE);
+        overlayPanel.animate().alpha(1f).translationY(0f).setDuration(220).setInterpolator(new DecelerateInterpolator()).start();
+    }
+
+    private void hideOverlay() {
+        overlayPanel.animate().alpha(0f).translationY(ui.dp(30)).setDuration(160).withEndAction(() -> overlayPanel.setVisibility(View.GONE)).start();
+        if (screen == Screen.START) { startPanel.setVisibility(View.VISIBLE); fillStart(); focusStart(); } else if (web != null) web.requestFocus();
+    }
+
+    /** Tabs: one 16:9 card per tab (favicon, title, host); OK switches, long-press closes, "+" opens a new one. */
+    private void showTabs() {
+        showOverlay(getString(R.string.tabs));
+        LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL); row.setClipChildren(false);
+        int w = ui.dp(230), h = ui.dp(130);
+        for (int i = 0; i < store.tabs.size(); i++) {
+            final int idx = i; Store.Entry t = store.tabs.get(i);
+            FrameLayout card = ui.card(w, h, i == store.activeTab ? 0xFF24314F : 0xFF1A2238);
+            LinearLayout inner = new LinearLayout(this); inner.setOrientation(LinearLayout.VERTICAL); inner.setGravity(Gravity.CENTER); inner.setPadding(ui.dp(16), 0, ui.dp(16), 0);
+            android.graphics.Bitmap ic = store.icon(host(t.url));
+            if (ic != null) { ImageView iv = new ImageView(this); iv.setImageBitmap(ic); iv.setBackground(ui.rounded(0xFFFFFFFF, 8)); iv.setPadding(ui.dp(4), ui.dp(4), ui.dp(4), ui.dp(4)); inner.addView(iv, new LinearLayout.LayoutParams(ui.dp(36), ui.dp(36))); }
+            else { TextView l = ui.text(22, true, Ui.TEXT); l.setText(initial(t)); l.setGravity(Gravity.CENTER); l.setBackground(ui.rounded(colorFor(t.url), 8)); inner.addView(l, new LinearLayout.LayoutParams(ui.dp(36), ui.dp(36))); }
+            TextView title = ui.text(14, true, Ui.TEXT); title.setText(t.title.isEmpty() ? host(t.url) : t.title); title.setMaxLines(1); title.setEllipsize(android.text.TextUtils.TruncateAt.END); title.setGravity(Gravity.CENTER); title.setPadding(0, ui.dp(10), 0, 0);
+            TextView sub = ui.text(12, false, 0xB3FFFFFF); sub.setText(host(t.url)); sub.setMaxLines(1); sub.setGravity(Gravity.CENTER);
+            inner.addView(title); inner.addView(sub);
+            card.addView(inner, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            card.setOnClickListener(v -> { saveActiveTab(); overlayPanel.setVisibility(View.GONE); loadTab(idx); });
+            card.setOnLongClickListener(v -> { closeTab(idx); return true; });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(w, h); lp.setMarginEnd(ui.dp(18)); row.addView(card, lp);
+        }
+        if (store.tabs.size() < getResources().getInteger(R.integer.max_tabs)) {
+            FrameLayout add = ui.card(w, h, 0x24FFFFFF);
+            add.addView(ui.icon(R.drawable.ic_add, 34, 0xA6FFFFFF), new FrameLayout.LayoutParams(ui.dp(34), ui.dp(34), Gravity.CENTER));
+            add.setOnClickListener(v -> { saveActiveTab(); store.tabs.add(new Store.Entry("", "about:blank")); store.activeTab = store.tabs.size() - 1; store.saveTabs(); destroyWeb(); overlayPanel.setVisibility(View.GONE); showStart(); showKeyboard(false, null); });
+            row.addView(add, new LinearLayout.LayoutParams(w, h));
+        }
+        HorizontalScrollView sv = new HorizontalScrollView(this); sv.setHorizontalScrollBarEnabled(false); sv.setClipChildren(false); sv.setClipToPadding(false); sv.setPadding(0, ui.dp(16), 0, ui.dp(16)); sv.addView(row);
+        overlayBody.addView(sv);
+        LinearLayout hint = new LinearLayout(this); hint.setOrientation(LinearLayout.HORIZONTAL); hint.setGravity(Gravity.CENTER_VERTICAL);
+        hint.addView(ui.hint(new int[0], "OK", openWord())); hint.addView(ui.hint(new int[0], "OK ⏵", getString(R.string.close_tab))); hint.addView(ui.hint(new int[]{R.drawable.ic_arrow_left}, null, getString(R.string.done)));
+        LinearLayout.LayoutParams hl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT); hl.topMargin = ui.dp(20); overlayBody.addView(hint, hl);
+        if (row.getChildCount() > 0) row.getChildAt(Math.min(store.activeTab, row.getChildCount() - 1)).requestFocus();
+    }
+
+    private void closeTab(int idx) {
+        if (idx < 0 || idx >= store.tabs.size()) return;
+        boolean wasActive = idx == store.activeTab;
+        store.tabs.remove(idx);
+        if (store.activeTab >= store.tabs.size()) store.activeTab = Math.max(0, store.tabs.size() - 1);
+        store.saveTabs();
+        if (wasActive) { destroyWeb(); if (screen == Screen.PAGE) { overlayPanel.setVisibility(View.GONE); if (store.tabs.isEmpty()) showStart(); else loadTab(store.activeTab); return; } }
+        showTabs();
+    }
+
+    /** Settings: rows of label + value pill; OK toggles / cycles; destructive rows act at once. */
+    private void showSettings() {
+        showOverlay(getString(R.string.settings));
+        settingRow(getString(R.string.setting_adblock), store.adBlock() ? getString(R.string.on) : getString(R.string.off), () -> { store.set("adblock", !store.adBlock()); showSettings(); });
+        settingRow(getString(R.string.setting_desktop), store.desktopDefault() ? getString(R.string.desktop_site) : getString(R.string.mobile_site), () -> { store.set("desktop", !store.desktopDefault()); showSettings(); });
+        String eng = store.searchEngine();
+        settingRow(getString(R.string.setting_engine), eng.equals("duckduckgo") ? "DuckDuckGo" : eng.equals("bing") ? "Bing" : "Google", () -> { store.set("engine", eng.equals("google") ? "duckduckgo" : eng.equals("duckduckgo") ? "bing" : "google"); showSettings(); });
+        settingRow(getString(R.string.clear_history), "", () -> { store.clearHistory(); showToast(getString(R.string.done)); });
+        settingRow(getString(R.string.clear_cookies), "", () -> { CookieManager.getInstance().removeAllCookies(null); WebStorage.getInstance().deleteAllData(); if (web != null) web.clearCache(true); showToast(getString(R.string.done)); });
+        settingRow(getString(R.string.about), getString(R.string.app_name) + " 0.1 · " + adBlockSize(), null);
+        overlayBody.getChildAt(0).requestFocus();
+    }
+
+    private String adBlockSize() { return "262K " + (Locale.getDefault().getLanguage().equals("tr") ? "engelli alan adı" : "blocked domains"); }
+
+    private void settingRow(String label, String value, Runnable action) {
+        LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL); row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(ui.dp(18), 0, ui.dp(18), 0); row.setFocusable(action != null); row.setClickable(action != null);
+        GradientDrawable bg = ui.rounded(0x14FFFFFF, 12); row.setBackground(bg);
+        TextView l = ui.text(16, false, Ui.TEXT); l.setText(label); l.setShadowLayer(0, 0, 0, 0);
+        row.addView(l, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        TextView v = ui.text(14, false, 0xD9FFFFFF); v.setText(value); v.setShadowLayer(0, 0, 0, 0);
+        if (!value.isEmpty()) { v.setBackground(ui.rounded(0x2EFFFFFF, 14)); v.setPadding(ui.dp(12), ui.dp(5), ui.dp(12), ui.dp(5)); }
+        row.addView(v);
+        row.setOnFocusChangeListener((x, f) -> { bg.setColor(f ? Ui.PILL_FOCUS : 0x14FFFFFF); l.setTextColor(f ? Ui.TEXT_DARK : Ui.TEXT); v.setTextColor(f ? Ui.TEXT_DARK : 0xD9FFFFFF); if (!value.isEmpty()) ((GradientDrawable) v.getBackground()).setColor(f ? 0x1A000000 : 0x2EFFFFFF); });
+        if (action != null) row.setOnClickListener(x -> action.run());
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ui.dp(620), ui.dp(52)); lp.bottomMargin = ui.dp(10);
+        overlayBody.addView(row, lp);
     }
 
     // ---------- screens ----------
@@ -603,7 +738,7 @@ public class MainActivity extends Activity {
         s.setBuiltInZoomControls(false); s.setDisplayZoomControls(false);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
-        s.setUserAgentString(getResources().getString(R.string.desktop_ua));
+        if (store.desktopDefault()) s.setUserAgentString(getResources().getString(R.string.desktop_ua));
         web.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_BOUND, true);
         web.setBackgroundColor(Color.BLACK);
         web.setFocusable(true); web.setFocusableInTouchMode(true);
@@ -623,7 +758,7 @@ public class MainActivity extends Activity {
 
     private final class Client extends WebViewClient {
         @Override public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest r) {
-            if (r.isForMainFrame()) return null;
+            if (r.isForMainFrame() || !store.adBlock()) return null;
             if (adBlock.isBlocked(r.getUrl().getHost())) { adBlock.blockedCount++; handler.post(() -> blockedText.setText(String.format(getString(R.string.blocked), adBlock.blockedCount))); return AdBlock.empty(); }
             return null;
         }
@@ -636,7 +771,8 @@ public class MainActivity extends Activity {
             urlText.setText(shortUrl(url)); videoActive = false; hudPanel.setVisibility(View.GONE);
             progress.setVisibility(View.VISIBLE);
             String host = host(url);
-            v.getSettings().setUserAgentString(store.mobileSite(host) ? null : getResources().getString(R.string.desktop_ua));
+            boolean desktop = store.desktopDefault() != store.mobileSite(host); // per-site toggle flips the default
+            v.getSettings().setUserAgentString(desktop ? getResources().getString(R.string.desktop_ua) : null);
         }
         @Override public void onPageCommitVisible(WebView v, String url) {
             js("(function(){var s=document.createElement('style');s.id='__tvcss';s.textContent=" + quote(cosmeticCss) + ";(document.head||document.documentElement).appendChild(s);})()");
@@ -661,6 +797,7 @@ public class MainActivity extends Activity {
             if (p >= 100) progress.setVisibility(View.GONE);
         }
         @Override public void onReceivedTitle(WebView v, String title) { if (!store.tabs.isEmpty()) store.tabs.get(store.activeTab).title = title; }
+        @Override public void onReceivedIcon(WebView v, android.graphics.Bitmap icon) { if (v.getUrl() != null) store.saveIcon(host(v.getUrl()), icon); }
         @Override public void onShowCustomView(View view, CustomViewCallback cb) {
             if (fullscreenView != null) { cb.onCustomViewHidden(); return; }
             fullscreenView = view; fullscreenCallback = cb;
@@ -870,6 +1007,10 @@ public class MainActivity extends Activity {
 
     /** The WebView consumes D-pad keys itself, so page keys are intercepted here, before view dispatch. */
     @Override public boolean dispatchKeyEvent(KeyEvent e) {
+        if (overlayShowing()) {
+            if (e.getKeyCode() == KeyEvent.KEYCODE_BACK) { if (e.getAction() == KeyEvent.ACTION_UP) hideOverlay(); return true; }
+            return super.dispatchKeyEvent(e);
+        }
         if (screen == Screen.PAGE && !topBarShown && !keyboardShowing()) {
             int code = e.getKeyCode();
             boolean ok = code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER;
@@ -912,6 +1053,7 @@ public class MainActivity extends Activity {
         }
         if (screen == Screen.START) {
             if (code == KeyEvent.KEYCODE_MENU) { showKeyboard(false, null); return true; }
+            if (code == KeyEvent.KEYCODE_BACK && overlayShowing()) { hideOverlay(); return true; }
             return super.onKeyDown(code, e); // Back leaves the app, as on any TV app
         }
         // ---- PAGE ----
