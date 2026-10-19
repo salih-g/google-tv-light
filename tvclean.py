@@ -284,8 +284,26 @@ def cmd_install(dev, args):
     print(f"push {apk} -> {remote} ({os.path.getsize(apk) // 1024} KB)")
     if confirm_or_dry(args, f"install {os.path.basename(apk)}", actions):
         write_snapshot(dev, "before-install")
-        dev.push(apk, remote, progress_callback=None)
+        push_b64(dev, apk, remote)
         apply(dev, actions)
+
+
+def push_b64(dev, local: str, remote: str, chunk: int = 48_000):
+    """adb-shell's sync push times out on this TV's adbd; send the file as base64 chunks over the
+    shell instead and verify the md5 on the other side."""
+    import base64, hashlib
+    data = open(local, "rb").read()
+    enc = base64.b64encode(data).decode()
+    tmp = remote + ".b64"
+    sh(dev, f"rm -f {tmp} {remote}")
+    for i in range(0, len(enc), chunk):
+        sh(dev, f"echo -n '{enc[i:i + chunk]}' >> {tmp}")
+    sh(dev, f"base64 -d {tmp} > {remote} && rm -f {tmp}")
+    remote_md5 = sh(dev, f"md5sum {remote}").split()[0]
+    local_md5 = hashlib.md5(data).hexdigest()
+    if remote_md5 != local_md5:
+        sys.exit(f"push failed: md5 {remote_md5} != {local_md5}")
+    print(f"pushed {len(data) // 1024} KB, md5 ok")
 
 
 def cmd_reboot(dev, args):
