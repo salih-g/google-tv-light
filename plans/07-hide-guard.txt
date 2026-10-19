@@ -1,3 +1,0 @@
-# Safety Guard is PERSISTENT and the firmware re-enables it at every boot, so `sleep` does not stick.
-# It is TCL's memory killer: killed Play Services 11 times in the first 5 minutes after boot.
-com.tcl.guard

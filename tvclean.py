@@ -16,8 +16,11 @@ Usage
   tvclean.py snapshot                    save package states to snapshots/<timestamp>.json
   tvclean.py sleep  <plan.txt> [--yes]   disable packages listed in the plan (one per line, # comments)
   tvclean.py wake   <plan.txt> [--yes]   re-enable them
-  tvclean.py hide   <plan.txt> [--yes]   `pm hide` packages the firmware re-enables at boot
+  tvclean.py hide   <plan.txt> [--yes]   `pm hide` (refused by this TV's shell, kept for others)
   tvclean.py unhide <plan.txt> [--yes]   undo hide
+  tvclean.py remove <plan.txt> [--yes]   uninstall a system package for user 0 only (APK stays); for PERSISTENT apps
+  tvclean.py readd  <plan.txt> [--yes]   undo remove (pm install-existing)
+  tvclean.py reboot [--yes]              reboot after the package manager has flushed its state
   tvclean.py uninstall <plan.txt> [--yes]  remove Play Store apps listed in the plan
   tvclean.py restore <snapshot.json> [--yes]  re-enable everything that was enabled in the snapshot
   tvclean.py home check | home set <pkg/.Activity> [--yes] | home reset [--yes]
@@ -234,6 +237,53 @@ def cmd_unhide(dev, args):
         apply(dev, actions)
 
 
+def cmd_remove(dev, args):
+    """`pm uninstall -k --user 0` on a system package: the APK stays on the system partition and
+    `readd` (pm install-existing) brings it back. Needed for PERSISTENT packages, which the system
+    starts at boot even while disabled."""
+    plan, wanted = args[0], read_plan(args[0])
+    states = package_states(dev)
+    actions, skipped = [], []
+    for p in wanted:
+        if is_protected(p):
+            skipped.append((p, "PROTECTED, refused"))
+        elif p not in states:
+            skipped.append((p, "not installed for user 0"))
+        elif not states[p]["system"]:
+            skipped.append((p, "not a system package, use uninstall"))
+        else:
+            actions.append(f"pm uninstall -k --user 0 {p}")
+    for p, why in skipped:
+        print(f"  skip {p}: {why}")
+    if confirm_or_dry(args, f"remove {os.path.basename(plan)}", actions):
+        write_snapshot(dev, "before-remove")
+        apply(dev, actions)
+
+
+def cmd_readd(dev, args):
+    plan, wanted = args[0], read_plan(args[0])
+    states = package_states(dev)
+    actions = [f"pm install-existing --user 0 {p}" for p in wanted if p not in states]
+    if confirm_or_dry(args, f"readd {os.path.basename(plan)}", actions):
+        write_snapshot(dev, "before-readd")
+        apply(dev, actions)
+
+
+def cmd_reboot(dev, args):
+    """Reboot only after the package manager has flushed its settings; rebooting within seconds of
+    a pm change loses that change (seen twice on this TV)."""
+    if "--yes" not in args:
+        print("dry run: add --yes to reboot the TV")
+        return
+    print("sync + 30 s wait so packages.xml is written, then reboot")
+    sh(dev, "sync; sleep 30; sync")
+    try:
+        dev.shell("reboot", read_timeout_s=5)
+    except Exception:  # the connection drops as the TV goes down
+        pass
+    print("reboot sent")
+
+
 def cmd_uninstall(dev, args):
     plan, wanted = args[0], read_plan(args[0])
     states = package_states(dev)
@@ -260,6 +310,8 @@ def cmd_restore(dev, args):
     states = package_states(dev)
     actions = []
     for p, s in snap["packages"].items():
+        if s["system"] and p not in states:
+            actions.append(f"pm install-existing --user 0 {p}")
         if not s.get("hidden") and states.get(p, {}).get("hidden"):
             actions.append(f"pm unhide {p}")
         if s["enabled"] and p in states and not states[p]["enabled"]:
@@ -311,6 +363,9 @@ COMMANDS = {
     "wake": cmd_wake,
     "hide": cmd_hide,
     "unhide": cmd_unhide,
+    "remove": cmd_remove,
+    "readd": cmd_readd,
+    "reboot": cmd_reboot,
     "uninstall": cmd_uninstall,
     "restore": cmd_restore,
     "home": cmd_home,

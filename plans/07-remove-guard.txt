@@ -1,0 +1,6 @@
+# Safety Guard (TGuard) is a PERSISTENT system app: the system starts it at boot and restarts it
+# after force-stop even while it is disabled. It is TCL's memory killer (killed Play Services 11 times
+# in the first 5 minutes after a boot). `pm hide` is refused for shell on this TV, so the only
+# reversible way to keep it from running is to uninstall it for user 0; the APK stays in /product/app/TGuard
+# and `readd` (pm install-existing) restores it.
+com.tcl.guard
