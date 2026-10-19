@@ -72,7 +72,7 @@ public class MainActivity extends Activity {
 
     private FrameLayout root;
     private ImageView wallBack, wallFront;
-    private TextView clock, greeting, focusedName, wifiText;
+    private TextView clock, greeting, focusedName, wifiText, hint;
     private LinearLayout dock;
     private FrameLayout gridPanel;
     private GridLayout grid;
@@ -224,7 +224,7 @@ public class MainActivity extends Activity {
         dl.setMargins(dp(40), 0, dp(40), dp(56));
         root.addView(dock, dl);
 
-        TextView hint = text(12, false, 0x99FFFFFF); hint.setText("▼  tüm uygulamalar"); hint.setGravity(Gravity.CENTER_HORIZONTAL);
+        hint = text(12, false, 0x99FFFFFF); hint.setText("▼  tüm uygulamalar"); hint.setGravity(Gravity.CENTER_HORIZONTAL);
         FrameLayout.LayoutParams hl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
         hl.setMargins(0, 0, 0, dp(18));
         root.addView(hint, hl);
@@ -360,7 +360,7 @@ public class MainActivity extends Activity {
 
     private void showDock() {
         gridPanel.setVisibility(View.GONE);
-        dock.setVisibility(View.VISIBLE); focusedName.setVisibility(View.VISIBLE);
+        dock.setVisibility(View.VISIBLE); focusedName.setVisibility(View.VISIBLE); hint.setVisibility(View.VISIBLE);
         View f = lastDockFocus != null ? lastDockFocus : dock.getChildAt(0);
         if (f != null) f.requestFocus();
     }
@@ -368,8 +368,9 @@ public class MainActivity extends Activity {
     private void showGrid() {
         gridPanel.setAlpha(0f); gridPanel.setVisibility(View.VISIBLE);
         gridPanel.animate().alpha(1f).setDuration(180).setInterpolator(new DecelerateInterpolator()).start();
-        focusedName.setVisibility(View.INVISIBLE);
+        focusedName.setVisibility(View.INVISIBLE); hint.setVisibility(View.INVISIBLE);
         if (grid.getChildCount() > 0) grid.getChildAt(0).requestFocus();
+        dock.setVisibility(View.INVISIBLE); // after focus moved, so the dock tile's focus listener doesn't fire
     }
 
     // ---------- inputs ----------

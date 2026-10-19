@@ -37,7 +37,6 @@ final class Wallpapers {
     private final Map<String, List<String>> scenes = new HashMap<>(); // scene -> slots available
     private final List<String> sceneOrder = new ArrayList<>();
     private String currentScene, currentSlot;
-    private boolean frontIsTop = true;
 
     Wallpapers(Context ctx, ImageView back, ImageView front, Handler handler, int minutes, int w, int h) {
         this.ctx = ctx; this.back = back; this.front = front; this.handler = handler;
@@ -109,24 +108,24 @@ final class Wallpapers {
         if (scene.equals(currentScene) && frame.equals(currentSlot)) return;
         Bitmap bmp = decode("wallpapers/" + scene + "-" + frame + ".jpg");
         if (bmp == null) return;
-        ImageView top = frontIsTop ? front : back, bottom = frontIsTop ? back : front;
-        ImageView target = animate ? bottom : top;
         BitmapDrawable d = new BitmapDrawable(ctx.getResources(), bmp);
-        target.setImageDrawable(d);
-        if (animate) {
-            target.setAlpha(0f); target.setVisibility(View.VISIBLE);
-            ObjectAnimator a = ObjectAnimator.ofFloat(target, View.ALPHA, 0f, 1f);
+        // z-order never changes: `back` sits at the bottom, `front` right above it, the UI above both.
+        // A new frame fades in on `front`, then moves down to `back` so `front` is free for the next one.
+        if (animate && back.getDrawable() != null) {
+            front.animate().cancel();
+            front.setImageDrawable(d); front.setAlpha(0f); front.setVisibility(View.VISIBLE);
+            ObjectAnimator a = ObjectAnimator.ofFloat(front, View.ALPHA, 0f, 1f);
             a.setDuration(FADE_MS);
-            final ImageView old = top;
             a.addListener(new android.animation.AnimatorListenerAdapter() {
                 @Override public void onAnimationEnd(android.animation.Animator anim) {
-                    old.setImageDrawable(null); // release the previous frame
-                    old.setVisibility(View.INVISIBLE);
+                    back.setImageDrawable(d);           // previous frame's bitmap is released here
+                    front.setImageDrawable(null); front.setVisibility(View.INVISIBLE);
                 }
             });
-            target.bringToFront(); a.start(); frontIsTop = !frontIsTop;
+            a.start();
         } else {
-            top.setAlpha(1f); top.setVisibility(View.VISIBLE); top.bringToFront();
+            back.setImageDrawable(d); back.setAlpha(1f); back.setVisibility(View.VISIBLE);
+            front.setImageDrawable(null); front.setVisibility(View.INVISIBLE);
         }
         currentScene = scene; currentSlot = frame;
     }
