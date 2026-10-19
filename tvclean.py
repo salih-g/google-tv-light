@@ -21,6 +21,7 @@ Usage
   tvclean.py remove <plan.txt> [--yes]   uninstall a system package for user 0 only (APK stays); for PERSISTENT apps
   tvclean.py readd  <plan.txt> [--yes]   undo remove (pm install-existing)
   tvclean.py reboot [--yes]              reboot after the package manager has flushed its state
+  tvclean.py install <apk> [--grant=pkg:perm] [--yes]   push + pm install for user 0 (Home key untouched)
   tvclean.py uninstall <plan.txt> [--yes]  remove Play Store apps listed in the plan
   tvclean.py restore <snapshot.json> [--yes]  re-enable everything that was enabled in the snapshot
   tvclean.py home check | home set <pkg/.Activity> [--yes] | home reset [--yes]
@@ -269,6 +270,24 @@ def cmd_readd(dev, args):
         apply(dev, actions)
 
 
+def cmd_install(dev, args):
+    """Push an APK and install it for user 0. Does not touch the Home key; use `home set` for that."""
+    apk = args[0]
+    if not os.path.exists(apk):
+        sys.exit(f"no such file: {apk}")
+    remote = "/data/local/tmp/" + os.path.basename(apk)
+    actions = [f"pm install -r --user 0 {remote}", f"rm -f {remote}"]
+    for extra in args[1:]:
+        if extra.startswith("--grant="):  # e.g. --grant=dev.salih.tvhome:android.permission.ACCESS_FINE_LOCATION
+            pkg, perm = extra[len("--grant="):].split(":", 1)
+            actions.insert(1, f"pm grant {pkg} {perm}")
+    print(f"push {apk} -> {remote} ({os.path.getsize(apk) // 1024} KB)")
+    if confirm_or_dry(args, f"install {os.path.basename(apk)}", actions):
+        write_snapshot(dev, "before-install")
+        dev.push(apk, remote, progress_callback=None)
+        apply(dev, actions)
+
+
 def cmd_reboot(dev, args):
     """Reboot only after the package manager has flushed its settings; rebooting within seconds of
     a pm change loses that change (seen twice on this TV)."""
@@ -365,6 +384,7 @@ COMMANDS = {
     "unhide": cmd_unhide,
     "remove": cmd_remove,
     "readd": cmd_readd,
+    "install": cmd_install,
     "reboot": cmd_reboot,
     "uninstall": cmd_uninstall,
     "restore": cmd_restore,

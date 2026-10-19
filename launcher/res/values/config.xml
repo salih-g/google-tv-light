@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Launcher settings. Edit, then run launcher/build.sh and tvclean.py install.
+  Package names on the TV: .venv/bin/python -I tvclean.py shell 'pm list packages'
+-->
+<resources>
+    <!-- Dock apps, left to right. Apps that aren't installed are skipped. -->
+    <string-array name="dock_apps">
+        <item>com.netflix.ninja</item>
+        <item>com.google.android.youtube.tv</item>
+        <item>com.disney.disneyplus</item>
+        <item>com.wbd.stream</item>
+        <item>com.apple.atve.androidtv.appletv</item>
+        <item>com.turkcell.ott</item>
+        <item>com.kick.mobile</item>
+    </string-array>
+
+    <!-- Never shown as tiles: TV helpers that live in the Inputs menu. -->
+    <string-array name="hidden_apps">
+        <item>com.tcl.tv</item>
+        <item>com.tcl.suspension</item>
+        <item>com.tcl.t_solo</item>
+        <item>com.tcl.dashboard</item>
+        <item>dev.salih.tvhome</item>
+    </string-array>
+
+    <!-- The TV's Live TV / tuner app, listed first in the Inputs menu. -->
+    <string name="live_tv_package" translatable="false">com.tcl.tv</string>
+
+    <!-- The manufacturer's own source picker, used if switching to an input directly fails. -->
+    <string name="input_picker_package" translatable="false">com.tcl.suspension</string>
+
+    <!-- Tiles per row in the all-apps grid. -->
+    <integer name="columns">5</integer>
+
+    <!-- Minutes between wallpaper scene changes. -->
+    <integer name="wallpaper_minutes">30</integer>
+
+    <!-- Name used in the greeting. -->
+    <string name="owner_name" translatable="false">Salih</string>
+</resources>
