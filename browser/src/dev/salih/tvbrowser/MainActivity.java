@@ -773,6 +773,8 @@ public class MainActivity extends Activity {
     }
 
     private void ensureWeb() {
+        // DevTools only on the Android emulator (ranchu/goldfish), never on a real TV
+        if (android.os.Build.HARDWARE.equals("ranchu") || android.os.Build.HARDWARE.equals("goldfish")) WebView.setWebContentsDebuggingEnabled(true);
         if (web != null) return;
         web = new WebView(this);
         WebSettings s = web.getSettings();
@@ -829,7 +831,7 @@ public class MainActivity extends Activity {
             Store.Entry t = store.tabs.get(store.activeTab); t.url = url; t.title = v.getTitle() == null ? "" : v.getTitle();
             store.saveTabs(); // persist the real title now: the process can be killed without onStop
             handler.postDelayed(() -> js("window.tvnav && tvnav.removeOverlays() && tvbridge.toast('overlay')"), 1500);
-            if (!cursorMode) handler.postDelayed(() -> js("window.tvnav && tvnav.move('down')"), 300);
+            if (!cursorMode) handler.postDelayed(() -> js("window.tvnav && tvnav.start()"), 300);
         }
         @Override public boolean onRenderProcessGone(WebView v, RenderProcessGoneDetail d) {
             saveActiveTab(); destroyWeb(); handler.post(() -> loadTab(store.activeTab)); // rebuilt silently
@@ -838,6 +840,12 @@ public class MainActivity extends Activity {
     }
 
     private final class Chrome extends WebChromeClient {
+        /** Page script errors (ours included) go to logcat; nothing else is logged. */
+        @Override public boolean onConsoleMessage(android.webkit.ConsoleMessage m) {
+            if (m.messageLevel() == android.webkit.ConsoleMessage.MessageLevel.ERROR)
+                android.util.Log.w("tvbrowser", m.message() + " @" + m.sourceId() + ":" + m.lineNumber());
+            return true;
+        }
         @Override public void onProgressChanged(WebView v, int p) {
             progress.getLayoutParams().width = root.getWidth() * p / 100; progress.requestLayout();
             if (p >= 100) progress.setVisibility(View.GONE);
@@ -933,7 +941,7 @@ public class MainActivity extends Activity {
         if (cursorMode) {
             cursorX = root.getWidth() / 2f; cursorY = root.getHeight() / 2f; placeCursor();
             cursor.setVisibility(View.VISIBLE); js("window.tvnav && tvnav.clear()");
-        } else { cursor.setVisibility(View.GONE); js("window.tvnav && tvnav.move('down')"); }
+        } else { cursor.setVisibility(View.GONE); js("window.tvnav && tvnav.start()"); }
         showToast(getString(cursorMode ? R.string.cursor_mode : R.string.link_mode));
     }
 
@@ -1058,6 +1066,16 @@ public class MainActivity extends Activity {
             if (e.getKeyCode() == KeyEvent.KEYCODE_BACK) { if (e.getAction() == KeyEvent.ACTION_UP) hideOverlay(); return true; }
             return super.dispatchKeyEvent(e);
         }
+        if (screen == Screen.PAGE && topBarShown) {
+            // The bar is a strip above the page: Down or Back returns to the page. Handled here because a focused
+            // pill would otherwise pass Down to the view system, which moves focus into the WebView and leaves the bar open.
+            int code = e.getKeyCode();
+            if (code == KeyEvent.KEYCODE_DPAD_DOWN || code == KeyEvent.KEYCODE_BACK) {
+                if (e.getAction() == KeyEvent.ACTION_DOWN) hideTopBar();
+                return true;
+            }
+            if (code == KeyEvent.KEYCODE_DPAD_UP) return true;
+        }
         if (screen == Screen.PAGE && !topBarShown && !keyboardShowing()) {
             int code = e.getKeyCode();
             boolean ok = code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER;
@@ -1130,8 +1148,13 @@ public class MainActivity extends Activity {
                 int dx = code == KeyEvent.KEYCODE_DPAD_LEFT ? -1 : code == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : 0;
                 int dy = code == KeyEvent.KEYCODE_DPAD_UP ? -1 : code == KeyEvent.KEYCODE_DPAD_DOWN ? 1 : 0;
                 if (cursorMode) { moveCursor(dx, dy, e.getRepeatCount()); return true; }
-                if (dy < 0 && web != null && web.getScrollY() == 0 && e.getRepeatCount() == 0) { showTopBar(); return true; }
-                js("window.tvnav && tvnav.move('" + (dx < 0 ? "left" : dx > 0 ? "right" : dy < 0 ? "up" : "down") + "')");
+                String dir = dx < 0 ? "left" : dx > 0 ? "right" : dy < 0 ? "up" : "down";
+                boolean first = e.getRepeatCount() == 0;
+                // The page decides first; only when nothing is above and it cannot scroll up does Up reach the top bar.
+                if (web != null) web.evaluateJavascript("window.tvnav ? tvnav.move('" + dir + "') : 'none'", r -> {
+                    boolean atEdge = "\"edge\"".equals(r) || ("\"none\"".equals(r) && web != null && web.getScrollY() == 0);
+                    if (dy < 0 && first && atEdge) showTopBar();
+                });
                 return true;
             }
             case KeyEvent.KEYCODE_CHANNEL_UP: if (web != null) web.pageUp(false); return true;
