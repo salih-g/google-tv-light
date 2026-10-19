@@ -63,7 +63,7 @@ Zor yoldan öğrenilip araca işlenen şeyler:
 ## Hızlı başlangıç
 
 ```bash
-git clone <bu repo> tv && cd tv
+git clone https://github.com/salih-g/google-tv-light.git && cd google-tv-light
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 .venv/bin/python -I tvclean.py find        # TV'yi bulur, IP'yi .tv_host'a yazar; TV'deki izin sorusunu onayla

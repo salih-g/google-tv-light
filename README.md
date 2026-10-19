@@ -64,7 +64,7 @@ Things we learned the hard way, now built into the tool:
 ## Quick start
 
 ```bash
-git clone <this repo> tv && cd tv
+git clone https://github.com/salih-g/google-tv-light.git && cd google-tv-light
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 .venv/bin/python -I tvclean.py find        # finds the TV, saves its IP to .tv_host; accept the prompt on the TV
