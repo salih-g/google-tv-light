@@ -107,9 +107,13 @@ public class MainActivity extends Activity {
         int w = getResources().getDisplayMetrics().widthPixels, h = getResources().getDisplayMetrics().heightPixels;
         wallpapers = new Wallpapers(this, wallBack, wallFront, handler, getResources().getInteger(R.integer.wallpaper_minutes), w, h);
         loadApps();
+        gridOnResume = KeyService.ACTION_SHOW_APPS.equals(getIntent().getAction());
         // First paint: UI fades in over the wallpaper instead of popping.
         for (View v : new View[]{clock, greeting, pills, dockScroll, hint}) { v.setAlpha(0f); v.animate().alpha(1f).setDuration(600).setStartDelay(150).start(); }
     }
+
+    /** Set by the T key (KeyService) so the all-apps grid, not the dock, shows when the launcher comes up. */
+    private boolean gridOnResume;
 
     @Override protected void onResume() {
         super.onResume();
@@ -123,7 +127,7 @@ public class MainActivity extends Activity {
             registerReceiver(packageReceiver, f); receiverRegistered = true;
         }
         loadApps(); // picks up installs that happened while another app was in front
-        showDock(false);
+        if (gridOnResume) { gridOnResume = false; showGrid(); } else showDock(false);
     }
 
     @Override protected void onPause() {
@@ -136,8 +140,9 @@ public class MainActivity extends Activity {
     }
 
     @Override protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent); // Home pressed while already on top: back to the dock
-        showDock(true);
+        super.onNewIntent(intent);
+        // onResume follows and decides what shows: the grid for the T key, otherwise the dock (Home pressed on top)
+        gridOnResume = KeyService.ACTION_SHOW_APPS.equals(intent.getAction());
     }
 
     /**

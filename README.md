@@ -117,8 +117,23 @@ Undo: `tvclean.py wake plans/08-sleep-stock-home.txt --yes && tvclean.py home re
 
 On the TV: D-pad moves, OK opens, **Down** opens the all-apps grid with an inputs row, **Back**
 returns, **Menu** opens the inputs menu, **long-press OK** on a tile rearranges the dock or adds
-an app to it. Every other remote key (volume, mute, mic, Source, Settings, channel, app
-shortcuts) is left to the system and keeps working.
+an app to it. Every other remote key (volume, mute, mic, Source, Settings, channel) is left to
+the system and keeps working.
+
+**Remote app buttons.** On Google TV builds, TCL's key handler sends the Netflix, YouTube and
+Prime Video buttons only to the stock Google TV home (and Disney+ and the T key to
+`com.tcl.partnercustomizer`). With those asleep the buttons do nothing. The launcher ships an
+accessibility service that takes just those buttons first and opens the apps directly; it does
+not read the screen. The key map is `app_keys` in `config.xml` (`4062` Netflix, `4065` YouTube,
+`4099` Prime Video, `4141` Disney+, `4160` Apple TV, `4020` T key = all-apps grid). Turn it on
+once; `APP_AUTO_START` is TCL's own auto-start gate (Safety Guard's "Auto launch" switch), without
+it the system refuses to bind the service:
+
+```bash
+.venv/bin/python -I tvclean.py shell 'appops set dev.salih.tvhome APP_AUTO_START allow && settings put secure enabled_accessibility_services dev.salih.tvhome/.KeyService && settings put secure accessibility_enabled 1'
+```
+
+Off: `tvclean.py shell 'settings put secure enabled_accessibility_services "" && settings put secure accessibility_enabled 0'`.
 
 ### 3. Optional: block the telemetry at the router
 

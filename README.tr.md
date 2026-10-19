@@ -117,7 +117,22 @@ Geri al: `tvclean.py wake plans/08-sleep-stock-home.txt --yes && tvclean.py home
 TV'de: D-pad gezinir, OK açar, **Aşağı** tüm uygulamalar ızgarasını ve girişler satırını açar,
 **Geri** döner, **Menü** girişler menüsünü açar, bir kutuda **OK'ye uzun basmak** dock'u düzenler
 ya da uygulamayı dock'a ekler. Kumandanın diğer her tuşu (ses, sessiz, mikrofon, Kaynak,
-Ayarlar, kanal, uygulama kısayolları) sisteme bırakılır ve çalışmaya devam eder.
+Ayarlar, kanal) sisteme bırakılır ve çalışmaya devam eder.
+
+**Kumanda uygulama tuşları.** Google TV sürümlerinde TCL'nin tuş işleyicisi Netflix, YouTube ve
+Prime Video tuşlarını sadece Google TV'nin kendi ana ekranına yollar (Disney+ ve T tuşunu da
+`com.tcl.partnercustomizer`'a). Onlar uyurken tuşlar hiçbir şey yapmaz. Launcher, sadece bu tuşları
+önce yakalayıp uygulamaları doğrudan açan bir erişilebilirlik servisiyle gelir; ekranı okumaz.
+Tuş eşlemesi `config.xml` içindeki `app_keys` (`4062` Netflix, `4065` YouTube, `4099` Prime Video,
+`4141` Disney+, `4160` Apple TV, `4020` T tuşu = tüm uygulamalar ızgarası). Bir kez aç;
+`APP_AUTO_START`, TCL'nin kendi otomatik başlatma kapısıdır (Safety Guard'daki "Otomatik başlatma"
+anahtarı), o olmadan sistem servisi bağlamayı reddeder:
+
+```bash
+.venv/bin/python -I tvclean.py shell 'appops set dev.salih.tvhome APP_AUTO_START allow && settings put secure enabled_accessibility_services dev.salih.tvhome/.KeyService && settings put secure accessibility_enabled 1'
+```
+
+Kapatmak: `tvclean.py shell 'settings put secure enabled_accessibility_services "" && settings put secure accessibility_enabled 0'`.
 
 ### 3. İsteğe bağlı: telemetriyi modemde kes
 

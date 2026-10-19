@@ -30,6 +30,18 @@
     <!-- The manufacturer's own source picker, used if switching to an input directly fails. -->
     <string name="input_picker_package" translatable="false">com.tcl.suspension</string>
 
+    <!-- Remote app buttons: "keycode|package", or "keycode|@apps" for the all-apps grid.
+         Codes are the TV's own (see the key log: tvclean.py shell 'logcat -s TclPhoneWindowManager').
+         4062 Netflix, 4065 YouTube, 4099 Prime Video, 4141 Disney+, 4160 Apple TV, 4020 the T key. -->
+    <string-array name="app_keys" translatable="false">
+        <item>4062|com.netflix.ninja</item>
+        <item>4065|com.google.android.youtube.tv</item>
+        <item>4099|com.amazon.amazonvideo.livingroom</item>
+        <item>4141|com.disney.disneyplus</item>
+        <item>4160|com.apple.atve.androidtv.appletv</item>
+        <item>4020|@apps</item>
+    </string-array>
+
     <!-- Tiles per row in the all-apps grid. -->
     <integer name="columns">5</integer>
 

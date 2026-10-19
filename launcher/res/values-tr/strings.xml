@@ -16,4 +16,6 @@
     <string name="greeting_morning">Günaydın</string>
     <string name="greeting_day">İyi günler</string>
     <string name="greeting_evening">İyi akşamlar</string>
+    <string name="key_service_label">Kumanda uygulama tuşları</string>
+    <string name="key_service_description">Kumandadaki Netflix, YouTube, Prime Video ve diğer uygulama tuşlarıyla uygulamaları açar. Sadece bu tuşları okur, ekranı okumaz.</string>
 </resources>
