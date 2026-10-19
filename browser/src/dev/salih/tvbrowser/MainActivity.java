@@ -202,7 +202,7 @@ public class MainActivity extends Activity {
     }
 
     private void buildStart() {
-        startPanel = new FrameLayout(this);
+        startPanel = new FrameLayout(this); startPanel.setClipChildren(false); // card rows reach into the column's gutter
         View scrim = new View(this); scrim.setBackgroundColor(0x85000000);
         startPanel.addView(scrim, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
@@ -233,7 +233,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams h2l = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT); h2l.topMargin = ui.dp(34); column.addView(h2, h2l);
         recentRow = row(column, ui.dp(12));
         FrameLayout.LayoutParams col = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        col.setMargins(ui.dp(140), ui.dp(100), ui.dp(48), 0); startPanel.addView(column, col);
+        col.setMargins(ui.dp(140), ui.dp(100), ui.dp(START_END_INSET_DP), 0); startPanel.addView(column, col);
         startColumn = column;
         // YouTube TV style: while the rail has focus its expanded pill needs room, so the content slides right and dims.
         startPanel.getViewTreeObserver().addOnGlobalFocusChangeListener((old, now) -> {
@@ -258,13 +258,32 @@ public class MainActivity extends Activity {
 
     private String openWord() { return Locale.getDefault().getLanguage().equals("tr") ? "aç" : "open"; }
 
+    /**
+     * Horizontal scroller for focus-scaled cards. A focused card grows past its slot, so the
+     * scroller keeps a gutter of padding it may draw into (clipToPadding off) and is pulled out
+     * by the same amount, which keeps the first card aligned with the header above it.
+     * The row must not be clipped to its own bounds (clipChildren off), so the scroller clips
+     * itself to its outer bounds instead: scrolled-away cards stop at the gutter edge.
+     */
+    private static final int CARD_GUTTER_DP = 28, CARD_GUTTER_V_DP = 16, START_END_INSET_DP = 48, OVERLAY_INSET_DP = 56;
+    private HorizontalScrollView cardScroller(int endInsetDp) {
+        HorizontalScrollView sv = new Ui.CardScroller(this); sv.setHorizontalScrollBarEnabled(false); sv.setClipToPadding(false); sv.setClipChildren(false);
+        sv.setOutlineProvider(android.view.ViewOutlineProvider.BOUNDS); sv.setClipToOutline(true);
+        sv.setPadding(ui.dp(CARD_GUTTER_DP), ui.dp(CARD_GUTTER_V_DP), ui.dp(endInsetDp), ui.dp(CARD_GUTTER_V_DP));
+        return sv;
+    }
+    /** {@code endInsetDp}: distance from the parent's end to the screen edge, so the row runs off-screen on the right. */
+    private LinearLayout.LayoutParams cardScrollerParams(int top, int endInsetDp) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = top - ui.dp(CARD_GUTTER_V_DP); lp.setMarginStart(-ui.dp(CARD_GUTTER_DP)); lp.setMarginEnd(-ui.dp(endInsetDp));
+        return lp;
+    }
+
     private LinearLayout row(LinearLayout column, int top) {
-        HorizontalScrollView sv = new HorizontalScrollView(this); sv.setHorizontalScrollBarEnabled(false); sv.setClipChildren(false); sv.setClipToPadding(false);
-        sv.setPadding(0, ui.dp(16), 0, ui.dp(16));
+        HorizontalScrollView sv = cardScroller(START_END_INSET_DP);
         LinearLayout r = new LinearLayout(this); r.setOrientation(LinearLayout.HORIZONTAL); r.setClipChildren(false);
         sv.addView(r);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT); lp.topMargin = top - ui.dp(16);
-        column.addView(sv, lp);
+        column.addView(sv, cardScrollerParams(top, START_END_INSET_DP));
         return r;
     }
 
@@ -320,7 +339,9 @@ public class MainActivity extends Activity {
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ui.dp(40)); lp.setMarginEnd(ui.dp(10));
             recentRow.addView(r, lp);
         }
-        tabsText.setText(store.tabs.size() + " " + getString(R.string.tabs).toLowerCase(Locale.getDefault()));
+        int n = store.tabs.size();
+        tabsText.setVisibility(n == 0 ? View.GONE : View.VISIBLE);
+        tabsText.setText(getResources().getQuantityString(R.plurals.tab_count, n, n));
     }
 
     private final java.util.Set<String> iconFetches = new java.util.HashSet<>();
@@ -575,8 +596,8 @@ public class MainActivity extends Activity {
     /** Full-screen frosted panel used by the tabs and settings screens. */
     private void buildOverlay() {
         overlayPanel = new FrameLayout(this); overlayPanel.setBackgroundColor(0xF2141C2E); overlayPanel.setVisibility(View.GONE);
-        LinearLayout col = new LinearLayout(this); col.setOrientation(LinearLayout.VERTICAL); col.setClipChildren(false);
-        col.setPadding(ui.dp(56), ui.dp(44), ui.dp(56), ui.dp(28));
+        LinearLayout col = new LinearLayout(this); col.setOrientation(LinearLayout.VERTICAL); col.setClipChildren(false); col.setClipToPadding(false);
+        col.setPadding(ui.dp(OVERLAY_INSET_DP), ui.dp(44), ui.dp(OVERLAY_INSET_DP), ui.dp(28));
         overlayTitle = ui.text(22, true, Ui.TEXT); col.addView(overlayTitle);
         overlayBody = new LinearLayout(this); overlayBody.setOrientation(LinearLayout.VERTICAL); overlayBody.setClipChildren(false);
         LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT); bl.topMargin = ui.dp(24);
@@ -626,8 +647,25 @@ public class MainActivity extends Activity {
             add.setOnClickListener(v -> { saveActiveTab(); store.tabs.add(new Store.Entry("", "about:blank")); store.activeTab = store.tabs.size() - 1; store.saveTabs(); destroyWeb(); overlayPanel.setVisibility(View.GONE); showStart(); showKeyboard(false, null); });
             row.addView(add, new LinearLayout.LayoutParams(w, h));
         }
-        HorizontalScrollView sv = new HorizontalScrollView(this); sv.setHorizontalScrollBarEnabled(false); sv.setClipChildren(false); sv.setClipToPadding(false); sv.setPadding(0, ui.dp(16), 0, ui.dp(16)); sv.addView(row);
-        overlayBody.addView(sv);
+        HorizontalScrollView sv = cardScroller(OVERLAY_INSET_DP); sv.addView(row);
+        overlayBody.addView(sv, cardScrollerParams(ui.dp(CARD_GUTTER_V_DP), OVERLAY_INSET_DP));
+        if (store.tabs.size() > 1) {
+            // two-step: the first OK arms the pill (red, asks again), the second closes everything
+            LinearLayout all = ui.pill(R.drawable.ic_trash, getString(R.string.close_all_tabs), true, false);
+            TextView allLabel = Ui.label(all); GradientDrawable allBg = (GradientDrawable) all.getBackground();
+            View.OnFocusChangeListener base = all.getOnFocusChangeListener();
+            boolean[] armed = {false};
+            Runnable disarm = () -> { armed[0] = false; allLabel.setText(R.string.close_all_tabs); base.onFocusChange(all, all.hasFocus()); };
+            all.setOnFocusChangeListener((v, f) -> { base.onFocusChange(v, f); if (!f && armed[0]) disarm.run(); });
+            all.setOnClickListener(v -> {
+                if (armed[0]) { handler.removeCallbacks(disarm); closeAllTabs(); return; }
+                armed[0] = true; allLabel.setText(R.string.close_all_confirm); allLabel.setTextColor(Ui.TEXT); allBg.setColor(0xFFE5484D);
+                ((ImageView) all.getChildAt(0)).setImageTintList(android.content.res.ColorStateList.valueOf(Ui.TEXT));
+                handler.postDelayed(disarm, 3000);
+            });
+            LinearLayout.LayoutParams al = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ui.dp(38)); al.topMargin = ui.dp(6);
+            overlayBody.addView(all, al);
+        }
         LinearLayout hint = new LinearLayout(this); hint.setOrientation(LinearLayout.HORIZONTAL); hint.setGravity(Gravity.CENTER_VERTICAL);
         hint.addView(ui.hint(new int[0], "OK", openWord())); hint.addView(ui.hint(new int[0], "OK", getString(R.string.hint_hold_close))); hint.addView(ui.hint(new int[]{R.drawable.ic_arrow_left}, null, getString(R.string.done).toLowerCase(Locale.getDefault())));
         LinearLayout.LayoutParams hl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT); hl.topMargin = ui.dp(20); overlayBody.addView(hint, hl);
@@ -642,6 +680,13 @@ public class MainActivity extends Activity {
         store.saveTabs();
         if (wasActive) { destroyWeb(); if (screen == Screen.PAGE) { overlayPanel.setVisibility(View.GONE); if (store.tabs.isEmpty()) showStart(); else loadTab(store.activeTab); return; } }
         showTabs();
+    }
+
+    private void closeAllTabs() {
+        store.tabs.clear(); store.activeTab = 0; store.saveTabs();
+        destroyWeb();
+        overlayPanel.setVisibility(View.GONE);
+        showStart();
     }
 
     /** Settings: rows of label + value pill; OK toggles / cycles; destructive rows act at once. */
@@ -962,6 +1007,7 @@ public class MainActivity extends Activity {
         }
         if (store.tabs.size() < getResources().getInteger(R.integer.max_tabs)) { labels.add(getString(R.string.new_tab)); actions.add(() -> { saveActiveTab(); store.tabs.add(new Store.Entry("", "about:blank")); store.activeTab = store.tabs.size() - 1; store.saveTabs(); destroyWeb(); showStart(); }); }
         if (!store.tabs.isEmpty()) { labels.add(getString(R.string.close_tab)); actions.add(() -> { store.tabs.remove(store.activeTab); store.activeTab = Math.max(0, store.activeTab - 1); store.saveTabs(); destroyWeb(); if (store.tabs.isEmpty() || screen == Screen.START) showStart(); else loadTab(store.activeTab); }); }
+        if (store.tabs.size() > 1) { labels.add(getString(R.string.close_all_tabs)); actions.add(this::closeAllTabs); }
         menu(anchor, labels.toArray(new String[0]), actions.toArray(new Runnable[0]), false);
     }
 

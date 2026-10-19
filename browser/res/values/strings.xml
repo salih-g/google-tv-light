@@ -47,4 +47,10 @@
     <string name="off">Off</string>
     <string name="about">About</string>
     <string name="hint_hold_close">hold: close tab</string>
+    <string name="close_all_tabs">Close all tabs</string>
+    <string name="close_all_confirm">Press OK again to close all</string>
+    <plurals name="tab_count">
+        <item quantity="one">%d tab</item>
+        <item quantity="other">%d tabs</item>
+    </plurals>
 </resources>

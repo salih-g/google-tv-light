@@ -47,4 +47,10 @@
     <string name="off">Kapalı</string>
     <string name="about">Hakkında</string>
     <string name="hint_hold_close">basılı tut: sekmeyi kapat</string>
+    <string name="close_all_tabs">Tüm sekmeleri kapat</string>
+    <string name="close_all_confirm">Hepsini kapatmak için tekrar OK</string>
+    <plurals name="tab_count">
+        <item quantity="one">%d sekme</item>
+        <item quantity="other">%d sekme</item>
+    </plurals>
 </resources>

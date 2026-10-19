@@ -48,64 +48,69 @@ public final class R {
      */
     public static final int wallpaper_minutes=0x7f030001;
   }
+  public static final class plurals {
+    public static final int tab_count=0x7f040000;
+  }
   public static final class string {
-    public static final int about=0x7f040000;
-    public static final int add=0x7f040001;
-    public static final int add_bookmark=0x7f040002;
-    public static final int app_name=0x7f040003;
-    public static final int blocked=0x7f040004;
-    public static final int bookmarks=0x7f040005;
-    public static final int clear=0x7f040006;
-    public static final int clear_cookies=0x7f040007;
-    public static final int clear_history=0x7f040008;
-    public static final int close_tab=0x7f040009;
-    public static final int cursor_mode=0x7f04000a;
-    public static final int delete=0x7f04000b;
-    public static final int desktop_site=0x7f04000c;
+    public static final int about=0x7f050000;
+    public static final int add=0x7f050001;
+    public static final int add_bookmark=0x7f050002;
+    public static final int app_name=0x7f050003;
+    public static final int blocked=0x7f050004;
+    public static final int bookmarks=0x7f050005;
+    public static final int clear=0x7f050006;
+    public static final int clear_cookies=0x7f050007;
+    public static final int clear_history=0x7f050008;
+    public static final int close_all_confirm=0x7f050009;
+    public static final int close_all_tabs=0x7f05000a;
+    public static final int close_tab=0x7f05000b;
+    public static final int cursor_mode=0x7f05000c;
+    public static final int delete=0x7f05000d;
+    public static final int desktop_site=0x7f05000e;
     /**
      * Desktop user agent: most sites give the richer layout and the HTML5 player to this.
      */
-    public static final int desktop_ua=0x7f04000d;
-    public static final int done=0x7f04000e;
-    public static final int go=0x7f04000f;
-    public static final int hint_hold_close=0x7f040010;
-    public static final int hint_keyboard=0x7f040011;
-    public static final int hint_page=0x7f040012;
-    public static final int hint_start=0x7f040013;
-    public static final int hint_video_exit=0x7f040014;
-    public static final int hint_video_next=0x7f040015;
-    public static final int hint_video_pause=0x7f040016;
-    public static final int hint_video_rate=0x7f040017;
-    public static final int hint_video_seek=0x7f040018;
-    public static final int history=0x7f040019;
-    public static final int letters=0x7f04001a;
-    public static final int link_mode=0x7f04001b;
-    public static final int mobile_site=0x7f04001c;
-    public static final int move_left=0x7f04001d;
-    public static final int move_right=0x7f04001e;
-    public static final int new_tab=0x7f04001f;
-    public static final int no_voice=0x7f040020;
-    public static final int off=0x7f040021;
-    public static final int on=0x7f040022;
-    public static final int overlay_removed=0x7f040023;
-    public static final int recent=0x7f040024;
-    public static final int remove_bookmark=0x7f040025;
-    public static final int search=0x7f040026;
-    public static final int search_hint=0x7f040027;
+    public static final int desktop_ua=0x7f05000f;
+    public static final int done=0x7f050010;
+    public static final int go=0x7f050011;
+    public static final int hint_hold_close=0x7f050012;
+    public static final int hint_keyboard=0x7f050013;
+    public static final int hint_page=0x7f050014;
+    public static final int hint_start=0x7f050015;
+    public static final int hint_video_exit=0x7f050016;
+    public static final int hint_video_next=0x7f050017;
+    public static final int hint_video_pause=0x7f050018;
+    public static final int hint_video_rate=0x7f050019;
+    public static final int hint_video_seek=0x7f05001a;
+    public static final int history=0x7f05001b;
+    public static final int letters=0x7f05001c;
+    public static final int link_mode=0x7f05001d;
+    public static final int mobile_site=0x7f05001e;
+    public static final int move_left=0x7f05001f;
+    public static final int move_right=0x7f050020;
+    public static final int new_tab=0x7f050021;
+    public static final int no_voice=0x7f050022;
+    public static final int off=0x7f050023;
+    public static final int on=0x7f050024;
+    public static final int overlay_removed=0x7f050025;
+    public static final int recent=0x7f050026;
+    public static final int remove_bookmark=0x7f050027;
+    public static final int search=0x7f050028;
+    public static final int search_hint=0x7f050029;
     /**
      * Search engine URL with %s for the query.
      */
-    public static final int search_url=0x7f040028;
-    public static final int setting_adblock=0x7f040029;
-    public static final int setting_desktop=0x7f04002a;
-    public static final int setting_engine=0x7f04002b;
-    public static final int settings=0x7f04002c;
-    public static final int space=0x7f04002d;
-    public static final int symbols=0x7f04002e;
-    public static final int tabs=0x7f04002f;
-    public static final int voice_hint=0x7f040030;
+    public static final int search_url=0x7f05002a;
+    public static final int setting_adblock=0x7f05002b;
+    public static final int setting_desktop=0x7f05002c;
+    public static final int setting_engine=0x7f05002d;
+    public static final int settings=0x7f05002e;
+    public static final int space=0x7f05002f;
+    public static final int symbols=0x7f050030;
+    public static final int tabs=0x7f050031;
+    public static final int voice_hint=0x7f050032;
   }
   public static final class style {
-    public static final int Browser=0x7f050000;
+    public static final int Browser=0x7f060000;
   }
 }

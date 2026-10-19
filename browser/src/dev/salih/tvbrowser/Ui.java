@@ -3,9 +3,11 @@ package dev.salih.tvbrowser;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Outline;
+import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.util.TypedValue;
+import android.view.FocusFinder;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,6 +15,7 @@ import android.view.ViewOutlineProvider;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.OvershootInterpolator;
 import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -108,6 +111,29 @@ final class Ui {
         if (capText != null) { View c = keyCap(0, capText); LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) c.getLayoutParams(); lp.setMarginEnd(dp(4)); g.addView(c, lp); }
         TextView t = text(12, false, 0xD9FFFFFF); t.setText(label); t.setPadding(dp(4), 0, dp(22), 0); g.addView(t);
         return g;
+    }
+
+    /**
+     * Horizontal scroller that keeps the focused item inside its padding. The stock
+     * HorizontalScrollView reveals a focused child only up to its outer edge, so with a gutter
+     * (clipToPadding off) the last card would stop flush against the screen edge.
+     */
+    static final class CardScroller extends HorizontalScrollView {
+        CardScroller(Context ctx) { super(ctx); }
+        @Override protected int computeScrollDeltaToGetChildRectOnScreen(Rect r) {
+            if (getChildCount() == 0) return 0;
+            int sx = getScrollX(), w = getWidth();
+            int left = sx + getPaddingLeft(), right = sx + w - getPaddingRight();
+            int delta = r.right > right ? r.right - right : r.left < left ? r.left - left : 0;
+            int maxScroll = Math.max(0, getChildAt(0).getWidth() - (w - getPaddingLeft() - getPaddingRight()));
+            return Math.max(-sx, Math.min(delta, maxScroll - sx));
+        }
+        /** At either end of the row there is nothing to reveal; the stock "page scroll" would drift by the padding. */
+        @Override public boolean arrowScroll(int direction) {
+            View cur = findFocus();
+            if (cur != null && FocusFinder.getInstance().findNextFocus(this, cur, direction) == null) return false;
+            return super.arrowScroll(direction);
+        }
     }
 
     GradientDrawable rounded(int color, int radiusDp) { GradientDrawable d = new GradientDrawable(); d.setCornerRadius(dp(radiusDp)); d.setColor(color); return d; }
