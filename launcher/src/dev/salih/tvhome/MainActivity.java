@@ -8,6 +8,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.content.res.ColorStateList;
@@ -16,6 +17,8 @@ import android.graphics.Outline;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.media.AudioAttributes;
+import android.media.SoundPool;
 import android.media.tv.TvContract;
 import android.media.tv.TvInputInfo;
 import android.media.tv.TvInputManager;
@@ -88,6 +91,9 @@ public class MainActivity extends Activity {
     private PopupWindow inputsPopup;
     private boolean receiverRegistered;
     private ObjectAnimator kenBurns;
+    private SharedPreferences prefs;
+    private SoundPool sounds;
+    private int sNav, sSelect, sOpen;
 
     // ---------- lifecycle ----------
 
@@ -96,6 +102,11 @@ public class MainActivity extends Activity {
         dateFmt = new SimpleDateFormat("d MMMM EEEE", getResources().getConfiguration().getLocales().get(0));
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                 | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+        prefs = getSharedPreferences("home", MODE_PRIVATE);
+        // Soft UI sounds, bundled (the TV's own system click is silent on this set).
+        sounds = new SoundPool.Builder().setMaxStreams(3).setAudioAttributes(new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()).build();
+        sNav = sounds.load(this, R.raw.nav, 1); sSelect = sounds.load(this, R.raw.select, 1); sOpen = sounds.load(this, R.raw.open, 1);
         buildUi();
         setContentView(root);
         int w = getResources().getDisplayMetrics().widthPixels, h = getResources().getDisplayMetrics().heightPixels;
@@ -133,6 +144,10 @@ public class MainActivity extends Activity {
         super.onNewIntent(intent); // Home pressed while already on top: back to the dock
         showDock(true);
     }
+
+    @Override protected void onDestroy() { super.onDestroy(); sounds.release(); }
+
+    private void play(int id) { if (hasWindowFocus()) sounds.play(id, 0.6f, 0.6f, 1, 0, 1f); }
 
     private final BroadcastReceiver packageReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) { loadApps(); }
@@ -315,7 +330,7 @@ public class MainActivity extends Activity {
     private View pill(int iconRes, String label) {
         LinearLayout p = new LinearLayout(this); p.setOrientation(LinearLayout.HORIZONTAL); p.setGravity(Gravity.CENTER_VERTICAL);
         p.setPadding(dp(10), 0, dp(10), 0);
-        ImageView icon = new ImageView(this); icon.setImageResource(iconRes); icon.setImageTintList(ColorStateList.valueOf(0xFFFFFFFF));
+        ImageView icon = new ImageView(this); if (iconRes != 0) icon.setImageResource(iconRes); icon.setImageTintList(ColorStateList.valueOf(0xFFFFFFFF));
         p.addView(icon, new LinearLayout.LayoutParams(dp(18), dp(18)));
         TextView t = text(13, false, 0xFF111111); t.setText(label); t.setShadowLayer(0, 0, 0, 0);
         t.setPadding(dp(8), 0, 0, 0); t.setVisibility(View.GONE);
@@ -324,6 +339,7 @@ public class MainActivity extends Activity {
         GradientDrawable bg = new GradientDrawable(); bg.setCornerRadius(dp(17)); bg.setColor(0x8C0A0E1E);
         p.setBackground(bg);
         p.setOnFocusChangeListener((v, f) -> {
+            if (f) play(sNav);
             bg.setColor(f ? 0xF2FFFFFF : 0x8C0A0E1E);
             icon.setImageTintList(ColorStateList.valueOf(f ? 0xFF111111 : 0xFFFFFFFF));
             if (f) { t.setAlpha(0f); t.setVisibility(View.VISIBLE); t.animate().alpha(1f).setDuration(180).start(); }
@@ -356,11 +372,23 @@ public class MainActivity extends Activity {
 
     private App find(String pkg) { for (App a : apps) if (a.pkg.equals(pkg)) return a; return null; }
 
+    /** Dock order: what the owner arranged on the TV, else the list in config.xml. */
+    private List<String> dockPackages() {
+        String saved = prefs.getString("dock", null);
+        if (saved != null) return new ArrayList<>(Arrays.asList(saved.split(",")));
+        return new ArrayList<>(Arrays.asList(getResources().getStringArray(R.array.dock_apps)));
+    }
+
+    private void saveDock(List<String> pkgs) { prefs.edit().putString("dock", String.join(",", pkgs)).apply(); }
+
     private void fillDock() {
-        String focusedPkg = lastDockFocus != null && lastDockFocus.getTag() instanceof App ? ((App) lastDockFocus.getTag()).pkg : null;
+        fillDock(lastDockFocus != null && lastDockFocus.getTag() instanceof App ? ((App) lastDockFocus.getTag()).pkg : null);
+    }
+
+    private void fillDock(String focusedPkg) {
         dock.removeAllViews(); lastDockFocus = null;
         List<App> order = new ArrayList<>();
-        for (String pkg : getResources().getStringArray(R.array.dock_apps)) { App a = find(pkg); if (a != null) order.add(a); }
+        for (String pkg : dockPackages()) { App a = find(pkg); if (a != null) order.add(a); }
         if (order.isEmpty()) order = apps.subList(0, Math.min(7, apps.size())); // nothing configured is installed
         int w = dp(112), h = dp(63);
         for (App a : order) {
@@ -398,12 +426,15 @@ public class MainActivity extends Activity {
             v.animate().scaleX(f ? FOCUS_SCALE : 1f).scaleY(f ? FOCUS_SCALE : 1f).rotationY(0f)
                     .setDuration(f ? 260 : 180).setInterpolator(f ? SPRING : new DecelerateInterpolator()).start();
             ObjectAnimator.ofFloat(v, "elevation", f ? dp(14) : 0f).setDuration(200).start();
+            if (f) play(sNav);
             if (f && v.getParent() == dock) { // the grid shows no floating name
                 setFocusedName(a.label);
                 lastDockFocus = v; centerInDock(v);
             }
         });
+        card.setOnLongClickListener(v -> { showTileMenu(v, a); return true; });
         card.setOnClickListener(v -> {
+            play(sSelect);
             // Apple TV press: quick dip then launch
             v.animate().scaleX(FOCUS_SCALE * 0.94f).scaleY(FOCUS_SCALE * 0.94f).setDuration(70).withEndAction(() ->
                     v.animate().scaleX(FOCUS_SCALE).scaleY(FOCUS_SCALE).setDuration(120).start()).start();
@@ -411,6 +442,44 @@ public class MainActivity extends Activity {
                     .setComponent(a.component).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED));
         });
         return card;
+    }
+
+    /** Long press on a tile: rearrange the dock (move / remove) or add a grid app to it. */
+    private void showTileMenu(View tile, App a) {
+        boolean inDock = tile.getParent() == dock;
+        List<String> pkgs = dockPackages();
+        int idx = pkgs.indexOf(a.pkg);
+        LinearLayout list = new LinearLayout(this); list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(dp(8), dp(8), dp(8), dp(8));
+        GradientDrawable bg = new GradientDrawable(); bg.setCornerRadius(dp(16)); bg.setColor(0xF2151B2E);
+        list.setBackground(bg);
+        PopupWindow[] popup = new PopupWindow[1];
+        Runnable[] actions; String[] labels;
+        if (inDock) {
+            labels = new String[]{getString(R.string.move_left), getString(R.string.move_right), getString(R.string.remove_from_dock)};
+            actions = new Runnable[]{
+                () -> { if (idx > 0) { Collections.swap(pkgs, idx, idx - 1); saveDock(pkgs); fillDock(a.pkg); } },
+                () -> { if (idx >= 0 && idx < pkgs.size() - 1) { Collections.swap(pkgs, idx, idx + 1); saveDock(pkgs); fillDock(a.pkg); } },
+                () -> { pkgs.remove(a.pkg); saveDock(pkgs); fillDock(null); }};
+        } else {
+            boolean present = idx >= 0;
+            labels = new String[]{getString(present ? R.string.remove_from_dock : R.string.add_to_dock)};
+            actions = new Runnable[]{() -> { if (present) pkgs.remove(a.pkg); else pkgs.add(a.pkg); saveDock(pkgs); fillDock(null); }};
+        }
+        for (int i = 0; i < labels.length; i++) {
+            final Runnable act = actions[i];
+            View p = inputPill(new Input(labels[i], 0, () -> { popup[0].dismiss(); act.run(); showDock(false); }));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(36));
+            lp.setMargins(0, dp(3), 0, dp(3)); list.addView(p, lp);
+        }
+        popup[0] = new PopupWindow(list, dp(230), ViewGroup.LayoutParams.WRAP_CONTENT, true);
+        popup[0].setElevation(dp(16)); popup[0].setAnimationStyle(android.R.style.Animation_Dialog);
+        play(sOpen);
+        if (inDock) { // the dock sits at the bottom edge: open the menu above the tile
+            list.measure(View.MeasureSpec.makeMeasureSpec(dp(230), View.MeasureSpec.EXACTLY), View.MeasureSpec.UNSPECIFIED);
+            popup[0].showAsDropDown(tile, 0, -tile.getHeight() - list.getMeasuredHeight() - dp(40));
+        } else popup[0].showAsDropDown(tile, 0, -dp(8));
+        list.getChildAt(0).requestFocus();
     }
 
     private void setFocusedName(String name) {
@@ -445,6 +514,7 @@ public class MainActivity extends Activity {
     }
 
     private void showGrid() {
+        play(sOpen);
         gridPanel.setAlpha(0f); gridPanel.setTranslationY(dp(40)); gridPanel.setVisibility(View.VISIBLE);
         gridPanel.animate().alpha(1f).translationY(0f).setDuration(280).setInterpolator(new DecelerateInterpolator(1.8f)).start();
         for (View v : new View[]{focusedName, hint, pills}) v.animate().alpha(0f).setDuration(160).start();
@@ -481,9 +551,10 @@ public class MainActivity extends Activity {
         return list;
     }
 
-    /** Pill variant whose label is always visible, for the inputs row and popup. */
+    /** Pill variant whose label is always visible, for the inputs row and popups. */
     private View inputPill(Input in) {
         View p = pill(in.icon, in.label);
+        if (in.icon == 0) ((LinearLayout) p).getChildAt(0).setVisibility(View.GONE);
         TextView t = (TextView) ((LinearLayout) p).getChildAt(1);
         t.setVisibility(View.VISIBLE); t.setTextColor(0xFFFFFFFF);
         View.OnFocusChangeListener base = p.getOnFocusChangeListener();
@@ -518,6 +589,7 @@ public class MainActivity extends Activity {
         inputsPopup = new PopupWindow(list, dp(250), ViewGroup.LayoutParams.WRAP_CONTENT, true);
         inputsPopup.setElevation(dp(16));
         inputsPopup.setAnimationStyle(android.R.style.Animation_Dialog);
+        play(sOpen);
         if (anchor != null) inputsPopup.showAsDropDown(anchor, 0, dp(8));
         else inputsPopup.showAtLocation(root, Gravity.TOP | Gravity.END, dp(48), dp(84));
         list.getChildAt(0).requestFocus();

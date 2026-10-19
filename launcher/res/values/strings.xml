@@ -8,6 +8,10 @@
     <string name="apps">Apps</string>
     <string name="live_tv">Live TV</string>
     <string name="could_not_open">Couldn\'t open</string>
+    <string name="move_left">Move left</string>
+    <string name="move_right">Move right</string>
+    <string name="remove_from_dock">Remove from dock</string>
+    <string name="add_to_dock">Add to dock</string>
     <string name="greeting_night">Good night</string>
     <string name="greeting_morning">Good morning</string>
     <string name="greeting_day">Good afternoon</string>

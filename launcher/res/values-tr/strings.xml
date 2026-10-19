@@ -8,6 +8,10 @@
     <string name="apps">Uygulamalar</string>
     <string name="live_tv">Canlı TV</string>
     <string name="could_not_open">Açılamadı</string>
+    <string name="move_left">Sola taşı</string>
+    <string name="move_right">Sağa taşı</string>
+    <string name="remove_from_dock">Dock\'tan kaldır</string>
+    <string name="add_to_dock">Dock\'a ekle</string>
     <string name="greeting_night">İyi geceler</string>
     <string name="greeting_morning">Günaydın</string>
     <string name="greeting_day">İyi günler</string>
