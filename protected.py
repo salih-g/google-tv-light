@@ -2,7 +2,8 @@
 
 Everything here keeps a feature the owner uses (inputs, remote, casting, Assistant, updates)
 or is Android plumbing whose removal has bootloop / blank-screen reports on TCL sets.
-Verified against the package list of a TCL 50C645 (Google TV, Android 11, R51MT05).
+Written against the package list of a TCL 50C645 (Google TV, Android 11, R51MT05); on another
+TV, add that TV's input, remote and casting packages here before writing any plan.
 """
 
 PROTECTED = {
@@ -105,7 +106,7 @@ PROTECTED_PREFIXES = (
     "com.tcl.tclchannel.overlay",  # harmless overlay; disable the app, not the overlay
 )
 
-# Streaming apps the owner keeps. Not system-critical, listed so a typo in a plan can't remove them.
+# Streaming apps the owner keeps (edit for your TV). Not system-critical; listed so a typo in a plan can't remove them.
 KEEP_APPS = {
     "com.netflix.ninja",
     "com.google.android.youtube.tv",

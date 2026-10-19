@@ -1,0 +1,15 @@
+! TCL Google TV (RT51M platform) telemetry / promo endpoints seen in this TV's DNS log.
+! Add to AdGuard Home > Filters > Custom filtering rules. Firmware updates (on-hwupgrade-o) are left alone.
+||on-hweudc-o.api.leiniao.com^
+||hwmsg-as3-asia-o.api.leiniao.com^
+||hwmsg-as10-asia-o.api.leiniao.com^
+||on-hwmsg-ds-o.api.leiniao.com^
+||on-hwpreins-o.api.leiniao.com^
+||hwlauncher-o.api.leiniao.com^
+||on-hwlauncher-apps-o.api.leiniao.com^
+||s3.tcllauncher.com^
+||on-hwapps-o.api.leiniao.com^
+||hwtpc-o.api.leiniao.com^
+||hwbrowsernav-o.api.leiniao.com^
+||hwuc-conf-o.api.leiniao.com^
+||on-hwuc-conf-o.api.leiniao.com^

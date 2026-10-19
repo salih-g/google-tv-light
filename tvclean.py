@@ -11,6 +11,7 @@ Safety model
 - Mutating commands are dry-run unless --yes is given.
 
 Usage
+  tvclean.py find                        scan the Wi-Fi for a TV with ADB open, save its IP to .tv_host
   tvclean.py probe                       model, Android version, memory, home activity
   tvclean.py mem                         free RAM, swap, resident app list (before/after comparisons)
   tvclean.py snapshot                    save package states to snapshots/<timestamp>.json
@@ -379,6 +380,32 @@ def cmd_home(dev, args):
 
 # ---------- read-only commands ----------
 
+def cmd_find(_dev, args):
+    """Scan the local /24 for TVs with ADB (5555) open. Runs without a TV address."""
+    import socket, subprocess, concurrent.futures
+    ip = None
+    for iface in ("en0", "en1", "eth0", "wlan0"):
+        try:
+            ip = subprocess.run(["ipconfig", "getifaddr", iface], capture_output=True, text=True).stdout.strip() or None
+        except FileNotFoundError:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.connect(("8.8.8.8", 80)); ip = s.getsockname()[0]; s.close()
+        if ip: break
+    if not ip: sys.exit("could not determine this computer's IP")
+    net = ip.rsplit(".", 1)[0]
+    print(f"scanning {net}.0/24 for ADB (port 5555) ...")
+    def probe(h):
+        s = socket.socket(); s.settimeout(0.6)
+        try: s.connect((h, 5555)); return h
+        except OSError: return None
+        finally: s.close()
+    with concurrent.futures.ThreadPoolExecutor(64) as ex:
+        found = [h for h in ex.map(probe, [f"{net}.{i}" for i in range(1, 255)]) if h]
+    if not found: sys.exit("no device with ADB open; turn on USB debugging on the TV (Settings > System > About > tap Build 7x)")
+    for h in found: print("ADB open on", h)
+    open(os.path.join(HERE, ".tv_host"), "w").write(found[0] + "\n")
+    print(f"saved {found[0]} to .tv_host")
+
+
 def cmd_probe(dev):
     for p in ("ro.product.manufacturer", "ro.product.model", "ro.product.device",
               "ro.build.version.release", "ro.build.display.id", "ro.product.cpu.abilist"):
@@ -393,6 +420,7 @@ def cmd_probe(dev):
 
 
 COMMANDS = {
+    "find": cmd_find,
     "probe": lambda d, a: cmd_probe(d),
     "mem": lambda d, a: cmd_mem(d),
     "snapshot": lambda d, a: write_snapshot(d, a[0] if a else "manual"),
@@ -414,6 +442,8 @@ COMMANDS = {
 def main():
     if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:
         sys.exit(__doc__)
+    if sys.argv[1] == "find":
+        cmd_find(None, sys.argv[2:]); return
     dev = connect()
     try:
         COMMANDS[sys.argv[1]](dev, sys.argv[2:])

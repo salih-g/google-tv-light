@@ -604,7 +604,8 @@ public class MainActivity extends Activity {
         clock.setText(timeFmt.format(now));
         int h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
         int hello = h < 6 ? R.string.greeting_night : h < 12 ? R.string.greeting_morning : h < 18 ? R.string.greeting_day : R.string.greeting_evening;
-        greeting.setText(getString(hello) + ", " + getString(R.string.owner_name) + "  ·  " + dateFmt.format(now));
+        String owner = getString(R.string.owner_name).trim();
+        greeting.setText(getString(hello) + (owner.isEmpty() ? "" : ", " + owner) + "  ·  " + dateFmt.format(now));
         if (wifiLabel != null) {
             String ssid = null;
             try {

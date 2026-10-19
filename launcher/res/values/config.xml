@@ -36,6 +36,6 @@
     <!-- Minutes between wallpaper scene changes. -->
     <integer name="wallpaper_minutes">30</integer>
 
-    <!-- Name used in the greeting. -->
-    <string name="owner_name" translatable="false">Salih</string>
+    <!-- Name used in the greeting ("Good evening, Salih"). Leave empty for no name. -->
+    <string name="owner_name" translatable="false"></string>
 </resources>

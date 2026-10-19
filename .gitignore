@@ -8,3 +8,4 @@ __pycache__/
 # Launcher build output and signing key
 launcher/build/
 launcher/debug.keystore
+snapshots/
