@@ -1,0 +1,4 @@
+# Stock Google TV home + its fallback. Both must sleep for a third-party home to own the Home key
+# (see protected.py). Undo: tvclean.py wake plans/08-sleep-stock-home.txt --yes && tvclean.py home reset --yes
+com.google.android.apps.tv.launcherx       # Google TV home (priority 2)
+com.google.android.tungsten.setupwraith    # setup wizard / recovery home (priority 1)

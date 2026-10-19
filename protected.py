@@ -48,9 +48,9 @@ PROTECTED = {
     "com.google.android.ext.shared",
     "com.google.android.modulemetadata",
     "com.google.android.onetimeinitializer",
-    # --- home screen: stays installed, only detached from the Home key ---
-    "com.google.android.apps.tv.launcherx",
-    "com.google.android.tungsten.setupwraith",
+    # --- home screen: launcherx and setupwraith are NOT protected on purpose. Google TV gives
+    # them HOME priority 2 and 1, and Android ignores the preferred home when the top two
+    # candidates differ in priority, so a third-party home only works while both sleep.
     "com.android.tv.settings",
     # --- keep by owner's choice ---
     "com.google.android.videos",            # Google TV app
