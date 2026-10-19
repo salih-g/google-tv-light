@@ -565,7 +565,7 @@ public class MainActivity extends Activity {
         keys.addView(ui.hint(new int[]{R.drawable.ic_arrow_left, R.drawable.ic_arrow_right}, null, getString(R.string.hint_video_seek)));
         keys.addView(ui.hint(new int[0], "OK", getString(R.string.hint_video_pause)));
         keys.addView(ui.hint(new int[]{R.drawable.ic_arrow_down}, null, getString(R.string.hint_video_rate)));
-        keys.addView(ui.hint(new int[0], "←", getString(R.string.hint_video_exit)));
+        keys.addView(ui.hint(new int[]{R.drawable.ic_arrow_left}, null, getString(R.string.hint_video_exit)));
         LinearLayout.LayoutParams kl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT); kl.topMargin = ui.dp(14); col.addView(keys, kl);
         FrameLayout.LayoutParams cl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
         cl.setMargins(ui.dp(56), 0, ui.dp(56), ui.dp(40)); hudPanel.addView(col, cl);
@@ -613,8 +613,8 @@ public class MainActivity extends Activity {
             if (ic != null) { ImageView iv = new ImageView(this); iv.setImageBitmap(ic); iv.setBackground(ui.rounded(0xFFFFFFFF, 8)); iv.setPadding(ui.dp(4), ui.dp(4), ui.dp(4), ui.dp(4)); inner.addView(iv, new LinearLayout.LayoutParams(ui.dp(36), ui.dp(36))); }
             else { TextView l = ui.text(22, true, Ui.TEXT); l.setText(initial(t)); l.setGravity(Gravity.CENTER); l.setBackground(ui.rounded(colorFor(t.url), 8)); inner.addView(l, new LinearLayout.LayoutParams(ui.dp(36), ui.dp(36))); }
             TextView title = ui.text(14, true, Ui.TEXT); title.setText(t.title.isEmpty() ? host(t.url) : t.title); title.setMaxLines(1); title.setEllipsize(android.text.TextUtils.TruncateAt.END); title.setGravity(Gravity.CENTER); title.setPadding(0, ui.dp(10), 0, 0);
-            TextView sub = ui.text(12, false, 0xB3FFFFFF); sub.setText(host(t.url)); sub.setMaxLines(1); sub.setGravity(Gravity.CENTER);
-            inner.addView(title); inner.addView(sub);
+            inner.addView(title);
+            if (!t.title.isEmpty()) { TextView sub = ui.text(12, false, 0xB3FFFFFF); sub.setText(host(t.url)); sub.setMaxLines(1); sub.setGravity(Gravity.CENTER); inner.addView(sub); } // no duplicate host line when the title is the host
             card.addView(inner, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
             card.setOnClickListener(v -> { saveActiveTab(); overlayPanel.setVisibility(View.GONE); loadTab(idx); });
             card.setOnLongClickListener(v -> { closeTab(idx); return true; });
@@ -629,7 +629,7 @@ public class MainActivity extends Activity {
         HorizontalScrollView sv = new HorizontalScrollView(this); sv.setHorizontalScrollBarEnabled(false); sv.setClipChildren(false); sv.setClipToPadding(false); sv.setPadding(0, ui.dp(16), 0, ui.dp(16)); sv.addView(row);
         overlayBody.addView(sv);
         LinearLayout hint = new LinearLayout(this); hint.setOrientation(LinearLayout.HORIZONTAL); hint.setGravity(Gravity.CENTER_VERTICAL);
-        hint.addView(ui.hint(new int[0], "OK", openWord())); hint.addView(ui.hint(new int[0], "OK ⏵", getString(R.string.close_tab))); hint.addView(ui.hint(new int[]{R.drawable.ic_arrow_left}, null, getString(R.string.done)));
+        hint.addView(ui.hint(new int[0], "OK", openWord())); hint.addView(ui.hint(new int[0], "OK", getString(R.string.hint_hold_close))); hint.addView(ui.hint(new int[]{R.drawable.ic_arrow_left}, null, getString(R.string.done).toLowerCase(Locale.getDefault())));
         LinearLayout.LayoutParams hl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT); hl.topMargin = ui.dp(20); overlayBody.addView(hint, hl);
         if (row.getChildCount() > 0) row.getChildAt(Math.min(store.activeTab, row.getChildCount() - 1)).requestFocus();
     }
@@ -782,6 +782,7 @@ public class MainActivity extends Activity {
             js(navJs);
             store.visited(v.getTitle(), url);
             Store.Entry t = store.tabs.get(store.activeTab); t.url = url; t.title = v.getTitle() == null ? "" : v.getTitle();
+            store.saveTabs(); // persist the real title now: the process can be killed without onStop
             handler.postDelayed(() -> js("window.tvnav && tvnav.removeOverlays() && tvbridge.toast('overlay')"), 1500);
             if (!cursorMode) handler.postDelayed(() -> js("window.tvnav && tvnav.move('down')"), 300);
         }

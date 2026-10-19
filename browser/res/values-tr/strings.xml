@@ -46,4 +46,5 @@
     <string name="on">Açık</string>
     <string name="off">Kapalı</string>
     <string name="about">Hakkında</string>
+    <string name="hint_hold_close">basılı tut: sekmeyi kapat</string>
 </resources>
