@@ -17,8 +17,6 @@ import android.graphics.Outline;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
-import android.media.AudioAttributes;
-import android.media.SoundPool;
 import android.media.tv.TvContract;
 import android.media.tv.TvInputInfo;
 import android.media.tv.TvInputManager;
@@ -30,6 +28,7 @@ import android.provider.Settings;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.SoundEffectConstants;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
@@ -92,8 +91,8 @@ public class MainActivity extends Activity {
     private boolean receiverRegistered;
     private ObjectAnimator kenBurns;
     private SharedPreferences prefs;
-    private SoundPool sounds;
-    private int sNav, sSelect, sOpen;
+    private View prevFocus;
+    private int lastDir = View.FOCUS_RIGHT;
 
     // ---------- lifecycle ----------
 
@@ -103,10 +102,6 @@ public class MainActivity extends Activity {
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                 | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
         prefs = getSharedPreferences("home", MODE_PRIVATE);
-        // Soft UI sounds, bundled (the TV's own system click is silent on this set).
-        sounds = new SoundPool.Builder().setMaxStreams(3).setAudioAttributes(new AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()).build();
-        sNav = sounds.load(this, R.raw.nav, 1); sSelect = sounds.load(this, R.raw.select, 1); sOpen = sounds.load(this, R.raw.open, 1);
         buildUi();
         setContentView(root);
         int w = getResources().getDisplayMetrics().widthPixels, h = getResources().getDisplayMetrics().heightPixels;
@@ -145,9 +140,15 @@ public class MainActivity extends Activity {
         showDock(true);
     }
 
-    @Override protected void onDestroy() { super.onDestroy(); sounds.release(); }
-
-    private void play(int id) { if (hasWindowFocus()) sounds.play(id, 0.6f, 0.6f, 1, 0, 1f); }
+    /**
+     * The TV's own navigation sound. ViewRootImpl plays it for key-driven focus moves, except inside
+     * scrolling containers (the dock and the grid), which move focus themselves silently; this fills
+     * that gap only for moves between siblings, so cross-container moves don't sound twice.
+     */
+    private void navSound(View v) {
+        if (prevFocus != null && prevFocus.getParent() == v.getParent()) v.playSoundEffect(SoundEffectConstants.getContantForFocusDirection(lastDir));
+        prevFocus = v;
+    }
 
     private final BroadcastReceiver packageReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) { loadApps(); }
@@ -185,12 +186,15 @@ public class MainActivity extends Activity {
                 if (gridPanel.getVisibility() == View.VISIBLE) { showDock(true); return true; }
                 return true; // Back on the home screen does nothing (never falls into the stock launcher)
             case KeyEvent.KEYCODE_DPAD_DOWN:
+                lastDir = View.FOCUS_DOWN;
                 if (gridPanel.getVisibility() != View.VISIBLE && dock.hasFocus()) { showGrid(); return true; }
                 break;
             case KeyEvent.KEYCODE_DPAD_UP:
+                lastDir = View.FOCUS_UP;
                 if (gridPanel.getVisibility() == View.VISIBLE && isOnFirstGridRow()) { showDock(true); return true; }
                 break;
             case KeyEvent.KEYCODE_DPAD_LEFT: case KeyEvent.KEYCODE_DPAD_RIGHT:
+                lastDir = code == KeyEvent.KEYCODE_DPAD_LEFT ? View.FOCUS_LEFT : View.FOCUS_RIGHT;
                 tilt(getCurrentFocus(), code == KeyEvent.KEYCODE_DPAD_LEFT ? -1 : 1, e.getRepeatCount() > 0);
                 break;
         }
@@ -339,7 +343,7 @@ public class MainActivity extends Activity {
         GradientDrawable bg = new GradientDrawable(); bg.setCornerRadius(dp(17)); bg.setColor(0x8C0A0E1E);
         p.setBackground(bg);
         p.setOnFocusChangeListener((v, f) -> {
-            if (f) play(sNav);
+            if (f) prevFocus = v; // ViewRootImpl already plays the sound for pill moves
             bg.setColor(f ? 0xF2FFFFFF : 0x8C0A0E1E);
             icon.setImageTintList(ColorStateList.valueOf(f ? 0xFF111111 : 0xFFFFFFFF));
             if (f) { t.setAlpha(0f); t.setVisibility(View.VISIBLE); t.animate().alpha(1f).setDuration(180).start(); }
@@ -426,7 +430,7 @@ public class MainActivity extends Activity {
             v.animate().scaleX(f ? FOCUS_SCALE : 1f).scaleY(f ? FOCUS_SCALE : 1f).rotationY(0f)
                     .setDuration(f ? 260 : 180).setInterpolator(f ? SPRING : new DecelerateInterpolator()).start();
             ObjectAnimator.ofFloat(v, "elevation", f ? dp(14) : 0f).setDuration(200).start();
-            if (f) play(sNav);
+            if (f) navSound(v);
             if (f && v.getParent() == dock) { // the grid shows no floating name
                 setFocusedName(a.label);
                 lastDockFocus = v; centerInDock(v);
@@ -434,7 +438,6 @@ public class MainActivity extends Activity {
         });
         card.setOnLongClickListener(v -> { showTileMenu(v, a); return true; });
         card.setOnClickListener(v -> {
-            play(sSelect);
             // Apple TV press: quick dip then launch
             v.animate().scaleX(FOCUS_SCALE * 0.94f).scaleY(FOCUS_SCALE * 0.94f).setDuration(70).withEndAction(() ->
                     v.animate().scaleX(FOCUS_SCALE).scaleY(FOCUS_SCALE).setDuration(120).start()).start();
@@ -474,7 +477,6 @@ public class MainActivity extends Activity {
         }
         popup[0] = new PopupWindow(list, dp(230), ViewGroup.LayoutParams.WRAP_CONTENT, true);
         popup[0].setElevation(dp(16)); popup[0].setAnimationStyle(android.R.style.Animation_Dialog);
-        play(sOpen);
         if (inDock) { // the dock sits at the bottom edge: open the menu above the tile
             list.measure(View.MeasureSpec.makeMeasureSpec(dp(230), View.MeasureSpec.EXACTLY), View.MeasureSpec.UNSPECIFIED);
             popup[0].showAsDropDown(tile, 0, -tile.getHeight() - list.getMeasuredHeight() - dp(40));
@@ -509,15 +511,16 @@ public class MainActivity extends Activity {
             v.setVisibility(View.VISIBLE);
             if (animate) v.animate().alpha(1f).setDuration(220).start(); else v.setAlpha(1f);
         }
+        prevFocus = null; // programmatic move, no sound
         View f = lastDockFocus != null ? lastDockFocus : dock.getChildAt(0);
         if (f != null) f.requestFocus();
     }
 
     private void showGrid() {
-        play(sOpen);
         gridPanel.setAlpha(0f); gridPanel.setTranslationY(dp(40)); gridPanel.setVisibility(View.VISIBLE);
         gridPanel.animate().alpha(1f).translationY(0f).setDuration(280).setInterpolator(new DecelerateInterpolator(1.8f)).start();
         for (View v : new View[]{focusedName, hint, pills}) v.animate().alpha(0f).setDuration(160).start();
+        prevFocus = null; // programmatic move, no sound
         if (grid.getChildCount() > 0) grid.getChildAt(0).requestFocus();
         dockScroll.animate().alpha(0f).setDuration(160).withEndAction(() -> dockScroll.setVisibility(View.INVISIBLE)).start();
     }
@@ -589,7 +592,6 @@ public class MainActivity extends Activity {
         inputsPopup = new PopupWindow(list, dp(250), ViewGroup.LayoutParams.WRAP_CONTENT, true);
         inputsPopup.setElevation(dp(16));
         inputsPopup.setAnimationStyle(android.R.style.Animation_Dialog);
-        play(sOpen);
         if (anchor != null) inputsPopup.showAsDropDown(anchor, 0, dp(8));
         else inputsPopup.showAtLocation(root, Gravity.TOP | Gravity.END, dp(48), dp(84));
         list.getChildAt(0).requestFocus();
