@@ -125,7 +125,7 @@ Prime Video buttons only to the stock Google TV home (and Disney+ and the T key 
 `com.tcl.partnercustomizer`). With those asleep the buttons do nothing. The launcher ships an
 accessibility service that takes just those buttons first and opens the apps directly; it does
 not read the screen. The key map is `app_keys` in `config.xml` (`4062` Netflix, `4065` YouTube,
-`4099` Prime Video, `4141` Disney+, `4160` Apple TV, `4020` T key and `4140` Safety Guard key = all-apps grid). Turn it on
+`4099` Prime Video, `4141` Disney+, `4160` Apple TV, `4020` T key = all-apps grid, `4140` Safety Guard key = Nuvio). Turn it on
 once; `APP_AUTO_START` is TCL's own auto-start gate (Safety Guard's "Auto launch" switch), without
 it the system refuses to bind the service:
 

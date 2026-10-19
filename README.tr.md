@@ -124,7 +124,7 @@ Prime Video tuşlarını sadece Google TV'nin kendi ana ekranına yollar (Disney
 `com.tcl.partnercustomizer`'a). Onlar uyurken tuşlar hiçbir şey yapmaz. Launcher, sadece bu tuşları
 önce yakalayıp uygulamaları doğrudan açan bir erişilebilirlik servisiyle gelir; ekranı okumaz.
 Tuş eşlemesi `config.xml` içindeki `app_keys` (`4062` Netflix, `4065` YouTube, `4099` Prime Video,
-`4141` Disney+, `4160` Apple TV, `4020` T tuşu ve `4140` Safety Guard tuşu = tüm uygulamalar ızgarası). Bir kez aç;
+`4141` Disney+, `4160` Apple TV, `4020` T tuşu = tüm uygulamalar ızgarası, `4140` Safety Guard tuşu = Nuvio). Bir kez aç;
 `APP_AUTO_START`, TCL'nin kendi otomatik başlatma kapısıdır (Safety Guard'daki "Otomatik başlatma"
 anahtarı), o olmadan sistem servisi bağlamayı reddeder:
 
