@@ -355,12 +355,16 @@ public class MainActivity extends Activity {
         column.addView(box, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ui.dp(46)));
 
         suggestions = new LinearLayout(this); suggestions.setOrientation(LinearLayout.HORIZONTAL); suggestions.setClipChildren(false);
-        LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ui.dp(34)); sl.topMargin = ui.dp(16);
-        column.addView(suggestions, sl);
+        HorizontalScrollView ssv = new HorizontalScrollView(this); ssv.setHorizontalScrollBarEnabled(false); ssv.setClipChildren(false); ssv.setClipToPadding(false);
+        ssv.setPadding(0, ui.dp(6), 0, ui.dp(6)); ssv.addView(suggestions);
+        LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ui.dp(46)); sl.topMargin = ui.dp(10);
+        column.addView(ssv, sl);
 
         LinearLayout main = new LinearLayout(this); main.setOrientation(LinearLayout.HORIZONTAL); main.setClipChildren(false);
         keyGrid = new GridLayout(this); keyGrid.setColumnCount(7); keyGrid.setClipChildren(false);
-        main.addView(keyGrid, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 7f));
+        LinearLayout.LayoutParams kgl = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 7f);
+        kgl.setMarginStart(-ui.dp(3)); // key cells carry a 3dp margin; pull the grid out so key edges align with the search box
+        main.addView(keyGrid, kgl);
         LinearLayout fn = new LinearLayout(this); fn.setOrientation(LinearLayout.VERTICAL); fn.setClipChildren(false);
         fn.setPadding(ui.dp(24), 0, 0, 0);
         fn.addView(keyButton(R.drawable.ic_space, getString(R.string.space), v -> type(" ")));

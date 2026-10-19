@@ -51,6 +51,7 @@ final class Ui {
         ImageView icon = iconRes != 0 ? icon(iconRes, 20, TEXT) : null;
         if (icon != null) p.addView(icon);
         TextView t = text(14, false, labelAlways ? TEXT : TEXT_DARK); t.setText(label); t.setShadowLayer(0, 0, 0, 0);
+        t.setSingleLine(true); t.setEllipsize(android.text.TextUtils.TruncateAt.END);
         t.setPadding(iconRes != 0 ? dp(8) : 0, 0, 0, 0); t.setVisibility(labelAlways ? View.VISIBLE : View.GONE);
         p.addView(t);
         p.setFocusable(true); p.setClickable(true);
