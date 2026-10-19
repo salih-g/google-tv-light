@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tarayıcı</string>
+    <string name="search">Ara</string>
+    <string name="bookmarks">Yer imleri</string>
+    <string name="history">Geçmiş</string>
+    <string name="tabs">Sekmeler</string>
+    <string name="settings">Ayarlar</string>
+    <string name="recent">Son ziyaret edilenler</string>
+    <string name="add">Ekle</string>
+    <string name="search_hint">Ara ya da adres yaz</string>
+    <string name="voice_hint">Konuşmak için mikrofon tuşuna basılı tut</string>
+    <string name="space">Boşluk</string>
+    <string name="delete">Sil</string>
+    <string name="clear">Temizle</string>
+    <string name="symbols">Semboller</string>
+    <string name="letters">Harfler</string>
+    <string name="go">Git</string>
+    <string name="blocked">%d engellendi</string>
+    <string name="cursor_mode">İmleç</string>
+    <string name="link_mode">Linkler</string>
+    <string name="overlay_removed">Reklam katmanı kaldırıldı</string>
+    <string name="add_bookmark">Yer imlerine ekle</string>
+    <string name="remove_bookmark">Yer iminden kaldır</string>
+    <string name="move_left">Sola taşı</string>
+    <string name="move_right">Sağa taşı</string>
+    <string name="close_tab">Sekmeyi kapat</string>
+    <string name="new_tab">Yeni sekme</string>
+    <string name="desktop_site">Masaüstü sitesi</string>
+    <string name="mobile_site">Mobil site</string>
+    <string name="no_voice">Bu TV\'de sesli arama yok</string>
+    <string name="hint_start">OK aç · OK uzun basma: düzenle · Menü: adres çubuğu · Mikrofon: sesli ara</string>
+    <string name="hint_keyboard">OK yaz · Geri: kapat · Play/Pause: boşluk · Mikrofon: sesle yaz</string>
+    <string name="hint_video_seek">10 sn</string>
+    <string name="hint_video_pause">duraklat</string>
+    <string name="hint_video_next">sonraki</string>
+    <string name="hint_video_rate">hız</string>
+    <string name="hint_video_exit">çık</string>
+    <string name="hint_page">Yukarı: adres çubuğu · OK uzun basma: imleç · Menü: seçenekler</string>
+    <string name="clear_history">Geçmişi temizle</string>
+    <string name="clear_cookies">Çerezleri ve site verilerini temizle</string>
+    <string name="done">Tamam</string>
+</resources>

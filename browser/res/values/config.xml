@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Default bookmarks on first run: "title|url". Edit on the TV afterwards (long-press OK). -->
+    <string-array name="default_bookmarks">
+        <item>YouTube|https://www.youtube.com/tv</item>
+        <item>Google|https://www.google.com</item>
+        <item>Wikipedia|https://tr.wikipedia.org</item>
+    </string-array>
+    <!-- Search engine URL with %s for the query. -->
+    <string name="search_url" translatable="false">https://www.google.com/search?q=%s</string>
+    <!-- Desktop user agent: most sites give the richer layout and the HTML5 player to this. -->
+    <string name="desktop_ua" translatable="false">Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36</string>
+    <!-- Max tabs kept (records); only the visible one has a live WebView. -->
+    <integer name="max_tabs">3</integer>
+    <!-- Minutes between wallpaper scene changes on the start page. -->
+    <integer name="wallpaper_minutes">30</integer>
+</resources>
