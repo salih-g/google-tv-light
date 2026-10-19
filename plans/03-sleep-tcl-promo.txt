@@ -1,0 +1,9 @@
+# Batch 2: TCL promo, content rows and unused companions.
+com.tcl.esticker                 # on-screen promo stickers
+com.tcl.partnercustomizer        # partner promo rows for the stock launcher
+com.tcl.channelplus              # TCL Channel app
+com.tcl.dashboard                # TCL smart home dashboard
+com.tcl.browser                  # BrowseHere browser
+com.tcl.magiconnectfree          # MagiConnect phone companion
+com.tcl.hearaid                  # hearing aid pairing
+com.tcl.gamebar                  # Game Master overlay

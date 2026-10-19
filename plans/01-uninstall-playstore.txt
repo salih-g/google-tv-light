@@ -1,0 +1,7 @@
+# Play Store apps the owner no longer uses. Reinstall from Play Store if needed.
+com.stremio.one                  # Stremio
+com.mubi                         # MUBI
+com.valvesoftware.steamlink      # Steam Link
+com.exxen.android                # Exxen
+com.dsmart.blu.android           # D-Smart GO
+com.limelight                    # Moonlight

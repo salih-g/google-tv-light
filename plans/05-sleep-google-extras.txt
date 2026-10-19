@@ -1,0 +1,12 @@
+# Batch 4: Google / Android extras the owner does not use.
+android.autoinstalls.config.google.gtvpai   # silent promoted-app installer
+com.google.android.play.games               # Play Games
+com.google.android.youtube.tvmusic          # YouTube Music TV
+com.google.android.partnersetup             # RLZ ping / partner tracking
+com.google.android.feedback                 # crash feedback
+com.google.android.syncadapters.calendar    # calendar sync
+com.android.providers.calendar              # calendar storage
+com.android.messaging                       # SMS app
+com.android.camera2                         # camera app
+com.android.printspooler                    # printing
+com.google.android.apps.nbu.smartconnect.tv # Smart Connect

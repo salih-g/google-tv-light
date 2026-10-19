@@ -1,0 +1,4 @@
+# Batch 5, one at a time, measured: packages with side-effect or bootloop reports on other models.
+# Apply com.tcl.waterfall.overseas first, reboot, test; then com.tcl.guard, reboot, test.
+com.tcl.waterfall.overseas       # TCL content tab; bootloop reports on some models
+com.tcl.guard                    # Safety Guard cleaner (38 MB); also manages apps' Auto Launch permission

@@ -1,0 +1,6 @@
+# Private to this machine / this TV
+.venv/
+.adbkey/
+.tv_host
+__pycache__/
+.DS_Store

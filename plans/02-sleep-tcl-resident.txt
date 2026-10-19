@@ -1,0 +1,6 @@
+# Batch 1: TCL services that are resident in RAM right now (~300 MB) and start at boot.
+com.tcl.usercenter               # TCL account / phone pairing (91 MB)
+com.tcl.overseasappshow          # preinstalled app showcase / promos (85 MB)
+com.tcl.tv.tclhome_passive       # TCL Home content tab (77 MB)
+com.tcl.bi                       # usage analytics (47 MB)
+com.tcl.messagebox               # promo popups
