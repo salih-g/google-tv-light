@@ -69,9 +69,14 @@ final class Wallpapers {
         return "gece";
     }
 
+    // The slot last asked for (currentSlot can be a fallback frame) and when the scene last changed.
+    private String wantedSlot;
+    private long changedAt;
+
     private final Runnable tick = new Runnable() {
         @Override public void run() {
             String slot = slotFor(Calendar.getInstance());
+            wantedSlot = slot;
             // Slot changed: keep the scene if it has the new frame, so the light changes in place.
             if (!slot.equals(currentSlot) && currentScene != null && scenes.get(currentScene).contains(slot)) {
                 show(currentScene, slot, true);
@@ -82,13 +87,21 @@ final class Wallpapers {
         }
     };
 
-    void start() { handler.removeCallbacks(tick); handler.post(tick); }
+    /**
+     * Called on every return to Home. Resumes the cycle instead of restarting it: the first start shows a scene,
+     * later ones only wait out the rest of the interval (or switch now if the time-of-day slot changed meanwhile).
+     */
+    void start() {
+        handler.removeCallbacks(tick);
+        if (currentScene == null || !slotFor(Calendar.getInstance()).equals(wantedSlot)) { handler.post(tick); return; }
+        handler.postDelayed(tick, Math.max(0, changedAt + intervalMs - System.currentTimeMillis()));
+    }
     void stop() { handler.removeCallbacks(tick); }
 
     /** Called when the clock minute changes; switches frame exactly at a slot boundary. */
     void onMinute() {
         String slot = slotFor(Calendar.getInstance());
-        if (currentScene != null && !slot.equals(currentSlot)) { handler.removeCallbacks(tick); handler.post(tick); }
+        if (currentScene != null && !slot.equals(wantedSlot)) { handler.removeCallbacks(tick); handler.post(tick); }
     }
 
     private String nextScene(String slot) {
@@ -127,7 +140,7 @@ final class Wallpapers {
             back.setImageDrawable(d); back.setAlpha(1f); back.setVisibility(View.VISIBLE);
             front.setImageDrawable(null); front.setVisibility(View.INVISIBLE);
         }
-        currentScene = scene; currentSlot = frame;
+        currentScene = scene; currentSlot = frame; changedAt = System.currentTimeMillis();
     }
 
     /** A scene missing the exact slot shows its nearest earlier frame; night falls back to evening, then day. */
