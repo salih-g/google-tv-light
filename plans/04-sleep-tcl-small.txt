@@ -1,6 +1,5 @@
 # Batch 3: small TCL leftovers, none resident, several fire at boot.
 com.tcl.ocean.instructions       # on-TV manual
-com.tcl.keyhelp                  # remote key help
 com.tcl.assistant                # TCL assistant shim
 com.tcl.logkit                   # log collection
 com.tcl.t_solo                   # T-Solo

@@ -22,6 +22,7 @@ PROTECTED = {
     "com.tcl.tcl_bt_rcu_service",
     "com.tcl.micmanager",
     "com.google.android.tv.remote.service",
+    "com.tcl.keyhelp",                      # TV panel buttons (TclPhoneWindowManager.handlePanelButton)
     # --- casting / mirroring (owner uses them) ---
     "com.google.android.apps.mediashell",   # Chromecast built-in
     "com.tcl.miracast",                     # screen mirroring

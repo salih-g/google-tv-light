@@ -1,0 +1,4 @@
+# Undo for one package of batch 3: TCL's key handler sends the TV's own panel buttons (the joystick
+# under the screen) to this app's MenuHelpService; asleep, those buttons do nothing. No boot receiver,
+# so it costs nothing while idle. Apply with `wake`. Also listed in protected.py now.
+com.tcl.keyhelp                  # panel button menu + on-screen virtual keys
