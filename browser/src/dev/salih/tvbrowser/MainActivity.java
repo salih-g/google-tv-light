@@ -74,7 +74,7 @@ public class MainActivity extends Activity {
     private View progress, topScrim;
     private TextView urlText, blockedText, modeText, tabsText, toast, hudTitle, hudMeta, hudTime, clock;
     private View hudFill, hudKnob;
-    private LinearLayout rail, bookmarksRow, recentRow;
+    private LinearLayout rail, bookmarksRow, recentRow, startColumn;
     private TextView recentHeader;
     private WebView web;
     private View fullscreenView; private WebChromeClient.CustomViewCallback fullscreenCallback;
@@ -168,8 +168,12 @@ public class MainActivity extends Activity {
     }
 
     private String asset(String name) {
-        try (InputStream in = getAssets().open(name)) { return new String(in.readAllBytes(), StandardCharsets.UTF_8); }
-        catch (IOException e) { return ""; }
+        // InputStream.readAllBytes needs API 33; the TV is API 30.
+        try (InputStream in = getAssets().open(name); java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+            byte[] buf = new byte[16384]; int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            return new String(out.toByteArray(), StandardCharsets.UTF_8);
+        } catch (IOException e) { return ""; }
     }
 
     // ---------- UI ----------
@@ -229,6 +233,13 @@ public class MainActivity extends Activity {
         recentRow = row(column, ui.dp(12));
         FrameLayout.LayoutParams col = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         col.setMargins(ui.dp(140), ui.dp(100), ui.dp(48), 0); startPanel.addView(column, col);
+        startColumn = column;
+        // YouTube TV style: while the rail has focus its expanded pill needs room, so the content slides right and dims.
+        startPanel.getViewTreeObserver().addOnGlobalFocusChangeListener((old, now) -> {
+            boolean inRail = now != null && isDescendant(rail, now);
+            startColumn.animate().translationX(inRail ? ui.dp(96) : 0).alpha(inRail ? 0.55f : 1f).setDuration(220).setInterpolator(new DecelerateInterpolator()).start();
+            startHint.animate().translationX(inRail ? ui.dp(96) : 0).alpha(inRail ? 0.4f : 1f).setDuration(220).start();
+        });
 
         startHint = new LinearLayout(this); startHint.setOrientation(LinearLayout.HORIZONTAL); startHint.setGravity(Gravity.CENTER_VERTICAL);
         startHint.addView(ui.hint(new int[0], "OK", openWord()));
@@ -237,6 +248,11 @@ public class MainActivity extends Activity {
         FrameLayout.LayoutParams hl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.START);
         hl.setMargins(ui.dp(140), 0, 0, ui.dp(36)); startPanel.addView(startHint, hl);
         root.addView(startPanel, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    }
+
+    private static boolean isDescendant(View parent, View v) {
+        for (android.view.ViewParent p = v.getParent(); p != null; p = p.getParent()) if (p == parent) return true;
+        return false;
     }
 
     private String openWord() { return Locale.getDefault().getLanguage().equals("tr") ? "aç" : "open"; }
@@ -430,13 +446,39 @@ public class MainActivity extends Activity {
         typedView.setTextColor(typed.length() == 0 ? 0x99FFFFFF : Ui.TEXT);
         suggestions.removeAllViews();
         if (keyboardForField) return;
-        for (Store.Entry e : store.suggest(typed.toString(), 4)) {
-            LinearLayout p = ui.pill(store.bookmarkFor(e.url) != null ? R.drawable.ic_bookmark : R.drawable.ic_history, shortUrl(e.url), true, false);
-            p.setOnClickListener(v -> openUrl(e.url, true));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ui.dp(34)); lp.setMarginEnd(ui.dp(8));
-            suggestions.addView(p, lp);
-        }
+        for (Store.Entry e : store.suggest(typed.toString(), 3)) addSuggestion(store.bookmarkFor(e.url) != null ? R.drawable.ic_bookmark : R.drawable.ic_history, shortUrl(e.url), () -> openUrl(e.url, true));
+        handler.removeCallbacks(fetchSuggest);
+        if (typed.length() >= 2) handler.postDelayed(fetchSuggest, 250);
     }
+
+    private void addSuggestion(int icon, String label, Runnable open) {
+        LinearLayout p = ui.pill(icon, label, true, false);
+        p.setOnClickListener(v -> open.run());
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ui.dp(34)); lp.setMarginEnd(ui.dp(8));
+        suggestions.addView(p, lp);
+    }
+
+    /** Google's autocomplete endpoint (the same one Chrome and the YouTube/Google TV search use). */
+    private final Runnable fetchSuggest = () -> {
+        final String q = typed.toString().trim();
+        new Thread(() -> {
+            List<String> out = new ArrayList<>();
+            try {
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL("https://suggestqueries.google.com/complete/search?client=firefox&hl="
+                        + Locale.getDefault().getLanguage() + "&q=" + Uri.encode(q)).openConnection();
+                c.setConnectTimeout(3000); c.setReadTimeout(3000);
+                try (InputStream in = c.getInputStream(); java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream()) {
+                    byte[] buf = new byte[4096]; int n; while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+                    org.json.JSONArray arr = new org.json.JSONArray(new String(bo.toByteArray(), StandardCharsets.UTF_8)).getJSONArray(1);
+                    for (int i = 0; i < arr.length() && out.size() < 5; i++) out.add(arr.getString(i));
+                }
+            } catch (Exception ignored) { }
+            handler.post(() -> {
+                if (!q.equals(typed.toString().trim()) || screen != Screen.KEYBOARD) return; // stale
+                for (String sug : out) addSuggestion(R.drawable.ic_search, sug, () -> openUrl(toUrl(sug), true));
+            });
+        }, "suggest").start();
+    };
 
     private void showKeyboard(boolean forField, String initial) {
         keyboardForField = forField; symbols = false; fillKeys();

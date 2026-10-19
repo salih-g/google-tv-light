@@ -75,7 +75,7 @@ final class Ui {
     /** Rounded card; focus = spring scale + shadow, no ring. */
     FrameLayout card(int w, int h, int bg) {
         FrameLayout card = new FrameLayout(ctx);
-        card.setFocusable(true); card.setClickable(true); card.setBackgroundColor(bg);
+        card.setFocusable(true); card.setClickable(true); card.setBackground(rounded(bg, 9)); // a rounded drawable: the outline clip alone is not reliable on this TV
         card.setLayoutParams(new ViewGroup.LayoutParams(w, h));
         card.setOutlineProvider(new ViewOutlineProvider() {
             @Override public void getOutline(View v, Outline o) { o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), dp(9)); }
