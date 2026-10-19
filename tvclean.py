@@ -16,6 +16,8 @@ Usage
   tvclean.py snapshot                    save package states to snapshots/<timestamp>.json
   tvclean.py sleep  <plan.txt> [--yes]   disable packages listed in the plan (one per line, # comments)
   tvclean.py wake   <plan.txt> [--yes]   re-enable them
+  tvclean.py hide   <plan.txt> [--yes]   `pm hide` packages the firmware re-enables at boot
+  tvclean.py unhide <plan.txt> [--yes]   undo hide
   tvclean.py uninstall <plan.txt> [--yes]  remove Play Store apps listed in the plan
   tvclean.py restore <snapshot.json> [--yes]  re-enable everything that was enabled in the snapshot
   tvclean.py home check | home set <pkg/.Activity> [--yes] | home reset [--yes]
@@ -69,16 +71,33 @@ def sh(dev, cmd: str) -> str:
 
 # ---------- package state ----------
 
+def hidden_packages(dev) -> set:
+    """Packages hidden for user 0 (`pm hide`); they are absent from `pm list packages`."""
+    out = sh(dev, "dumpsys package packages | grep -E '^  Package \\[|^    User 0:'")
+    hidden, pkg = set(), None
+    for line in out.splitlines():
+        m = re.match(r"  Package \[(\S+)\]", line)
+        if m:
+            pkg = m.group(1)
+        elif "User 0:" in line and "hidden=true" in line and pkg:
+            hidden.add(pkg)
+    return hidden
+
+
 def package_states(dev) -> dict:
-    """{pkg: {"system": bool, "enabled": bool, "installer": str|None}} for user 0."""
+    """{pkg: {"system", "enabled", "hidden", "installer"}} for user 0."""
     all_pkgs = set(re.findall(r"package:(\S+)", sh(dev, "pm list packages")))
     system = set(re.findall(r"package:(\S+)", sh(dev, "pm list packages -s")))
     disabled = set(re.findall(r"package:(\S+)", sh(dev, "pm list packages -d")))
     third = dict(re.findall(r"package:(\S+)\s+installer=(\S+)", sh(dev, "pm list packages -3 -i")))
-    return {
-        p: {"system": p in system, "enabled": p not in disabled, "installer": third.get(p)}
+    hidden = hidden_packages(dev)
+    states = {
+        p: {"system": p in system, "enabled": p not in disabled, "hidden": False, "installer": third.get(p)}
         for p in sorted(all_pkgs)
     }
+    for p in hidden:
+        states[p] = {"system": True, "enabled": True, "hidden": True, "installer": None}
+    return states
 
 
 def write_snapshot(dev, label: str) -> str:
@@ -185,6 +204,36 @@ def cmd_wake(dev, args):
         apply(dev, actions)
 
 
+def cmd_hide(dev, args):
+    """`pm hide`: stronger than disable; survives the firmware re-enabling PERSISTENT packages at boot."""
+    plan, wanted = args[0], read_plan(args[0])
+    states = package_states(dev)
+    actions, skipped = [], []
+    for p in wanted:
+        if is_protected(p):
+            skipped.append((p, "PROTECTED, refused"))
+        elif p not in states:
+            skipped.append((p, "not installed"))
+        elif states[p]["hidden"]:
+            skipped.append((p, "already hidden"))
+        else:
+            actions.append(f"pm hide {p}")
+    for p, why in skipped:
+        print(f"  skip {p}: {why}")
+    if confirm_or_dry(args, f"hide {os.path.basename(plan)}", actions):
+        write_snapshot(dev, "before-hide")
+        apply(dev, actions)
+
+
+def cmd_unhide(dev, args):
+    plan, wanted = args[0], read_plan(args[0])
+    states = package_states(dev)
+    actions = [f"pm unhide {p}" for p in wanted if states.get(p, {}).get("hidden")]
+    if confirm_or_dry(args, f"unhide {os.path.basename(plan)}", actions):
+        write_snapshot(dev, "before-unhide")
+        apply(dev, actions)
+
+
 def cmd_uninstall(dev, args):
     plan, wanted = args[0], read_plan(args[0])
     states = package_states(dev)
@@ -211,6 +260,8 @@ def cmd_restore(dev, args):
     states = package_states(dev)
     actions = []
     for p, s in snap["packages"].items():
+        if not s.get("hidden") and states.get(p, {}).get("hidden"):
+            actions.append(f"pm unhide {p}")
         if s["enabled"] and p in states and not states[p]["enabled"]:
             actions.append(f"pm enable {p}")
     home = snap["home"].split()[-1] if snap.get("home") else ""
@@ -258,6 +309,8 @@ COMMANDS = {
     "snapshot": lambda d, a: write_snapshot(d, a[0] if a else "manual"),
     "sleep": cmd_sleep,
     "wake": cmd_wake,
+    "hide": cmd_hide,
+    "unhide": cmd_unhide,
     "uninstall": cmd_uninstall,
     "restore": cmd_restore,
     "home": cmd_home,
