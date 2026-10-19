@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Ana Ekran</string>
+    <string name="inputs">Girişler</string>
+    <string name="wifi">Wi-Fi</string>
+    <string name="settings">Ayarlar</string>
+    <string name="all_apps">Tüm uygulamalar</string>
+    <string name="apps">Uygulamalar</string>
+    <string name="live_tv">Canlı TV</string>
+    <string name="could_not_open">Açılamadı</string>
+    <string name="greeting_night">İyi geceler</string>
+    <string name="greeting_morning">Günaydın</string>
+    <string name="greeting_day">İyi günler</string>
+    <string name="greeting_evening">İyi akşamlar</string>
+</resources>

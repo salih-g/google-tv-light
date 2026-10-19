@@ -1,7 +1,7 @@
 package dev.salih.tvhome;
 
 import android.animation.ObjectAnimator;
-import android.animation.PropertyValuesHolder;
+import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Outline;
 import android.graphics.Typeface;
@@ -29,7 +30,10 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
+import android.view.animation.AccelerateDecelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
+import android.view.animation.LinearInterpolator;
+import android.view.animation.OvershootInterpolator;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
 import android.widget.HorizontalScrollView;
@@ -51,10 +55,10 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * One-screen home: wallpaper, clock, three pills (inputs, Wi-Fi, settings) and a dock of favourite
- * apps. Down opens the all-apps grid with an inputs row; Back returns to the dock. Every key the
- * launcher does not use falls through to the system, so the remote's volume, mute, power, mic,
- * source, settings, channel and app-shortcut buttons keep their native behaviour.
+ * One-screen home: wallpaper, clock, three icon pills (inputs, Wi-Fi, settings) and a scrolling
+ * dock of favourite apps. Down opens the all-apps grid with an inputs row; Back returns to the dock.
+ * Every key the launcher does not use falls through to the system, so the remote's volume, mute,
+ * power, mic, source, settings, channel and app-shortcut buttons keep their native behaviour.
  */
 public class MainActivity extends Activity {
 
@@ -65,30 +69,31 @@ public class MainActivity extends Activity {
         }
     }
 
-    private final Handler handler = new Handler(Looper.getMainLooper());
-    private final Locale tr = new Locale("tr", "TR");
-    private final SimpleDateFormat timeFmt = new SimpleDateFormat("HH:mm", Locale.US);
-    private final SimpleDateFormat dateFmt;
+    private static final float FOCUS_SCALE = 1.18f;
+    private static final OvershootInterpolator SPRING = new OvershootInterpolator(1.4f);
 
-    private FrameLayout root;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final SimpleDateFormat timeFmt = new SimpleDateFormat("HH:mm", Locale.US);
+    private SimpleDateFormat dateFmt;
+
+    private FrameLayout root, wallLayer, gridPanel;
     private ImageView wallBack, wallFront;
-    private TextView clock, greeting, focusedName, wifiText, hint;
-    private LinearLayout dock;
-    private FrameLayout gridPanel;
+    private TextView clock, greeting, focusedName, wifiLabel;
+    private HorizontalScrollView dockScroll;
+    private LinearLayout dock, inputsRow, pills, hint;
     private GridLayout grid;
-    private LinearLayout inputsRow;
     private Wallpapers wallpapers;
     private List<App> apps = new ArrayList<>();
     private View lastDockFocus;
     private PopupWindow inputsPopup;
     private boolean receiverRegistered;
-
-    public MainActivity() { dateFmt = new SimpleDateFormat("d MMMM EEEE", tr); }
+    private ObjectAnimator kenBurns;
 
     // ---------- lifecycle ----------
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        dateFmt = new SimpleDateFormat("d MMMM EEEE", getResources().getConfiguration().getLocales().get(0));
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                 | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
         buildUi();
@@ -96,11 +101,14 @@ public class MainActivity extends Activity {
         int w = getResources().getDisplayMetrics().widthPixels, h = getResources().getDisplayMetrics().heightPixels;
         wallpapers = new Wallpapers(this, wallBack, wallFront, handler, getResources().getInteger(R.integer.wallpaper_minutes), w, h);
         loadApps();
+        // First paint: UI fades in over the wallpaper instead of popping.
+        for (View v : new View[]{clock, greeting, pills, dockScroll, hint}) { v.setAlpha(0f); v.animate().alpha(1f).setDuration(600).setStartDelay(150).start(); }
     }
 
     @Override protected void onResume() {
         super.onResume();
         wallpapers.start();
+        startKenBurns();
         handler.post(minuteTick);
         if (!receiverRegistered) {
             IntentFilter f = new IntentFilter();
@@ -109,20 +117,21 @@ public class MainActivity extends Activity {
             registerReceiver(packageReceiver, f); receiverRegistered = true;
         }
         loadApps(); // picks up installs that happened while another app was in front
-        showDock();
+        showDock(false);
     }
 
     @Override protected void onPause() {
         super.onPause();
         wallpapers.stop();
+        if (kenBurns != null) kenBurns.pause();
         handler.removeCallbacks(minuteTick);
         if (receiverRegistered) { unregisterReceiver(packageReceiver); receiverRegistered = false; }
         if (inputsPopup != null && inputsPopup.isShowing()) inputsPopup.dismiss();
     }
 
     @Override protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent); // Home pressed while already on top: go back to the dock
-        showDock();
+        super.onNewIntent(intent); // Home pressed while already on top: back to the dock
+        showDock(true);
     }
 
     private final BroadcastReceiver packageReceiver = new BroadcastReceiver() {
@@ -138,25 +147,51 @@ public class MainActivity extends Activity {
         }
     };
 
+    /** Very slow zoom on the wallpaper layer (both frames), the way Apple TV screensavers breathe. */
+    private void startKenBurns() {
+        if (kenBurns == null) {
+            kenBurns = ObjectAnimator.ofFloat(wallLayer, View.SCALE_X, 1f, 1.06f);
+            kenBurns.setDuration(45_000); kenBurns.setRepeatCount(ValueAnimator.INFINITE); kenBurns.setRepeatMode(ValueAnimator.REVERSE);
+            kenBurns.setInterpolator(new AccelerateDecelerateInterpolator());
+            kenBurns.addUpdateListener(a -> wallLayer.setScaleY((Float) a.getAnimatedValue()));
+            kenBurns.start();
+        } else if (kenBurns.isPaused()) kenBurns.resume();
+    }
+
     // ---------- keys ----------
 
     @Override public boolean onKeyDown(int code, KeyEvent e) {
         switch (code) {
             case KeyEvent.KEYCODE_MENU:
-            case KeyEvent.KEYCODE_TV_INPUT: // Source key: show our picker; the system's own picker also fires if it owns the key
                 showInputs(null);
                 return true;
             case KeyEvent.KEYCODE_BACK:
-                if (gridPanel.getVisibility() == View.VISIBLE) { showDock(); return true; }
+                if (inputsPopup != null && inputsPopup.isShowing()) { inputsPopup.dismiss(); return true; }
+                if (gridPanel.getVisibility() == View.VISIBLE) { showDock(true); return true; }
                 return true; // Back on the home screen does nothing (never falls into the stock launcher)
             case KeyEvent.KEYCODE_DPAD_DOWN:
                 if (gridPanel.getVisibility() != View.VISIBLE && dock.hasFocus()) { showGrid(); return true; }
                 break;
             case KeyEvent.KEYCODE_DPAD_UP:
-                if (gridPanel.getVisibility() == View.VISIBLE && isOnFirstGridRow()) { showDock(); return true; }
+                if (gridPanel.getVisibility() == View.VISIBLE && isOnFirstGridRow()) { showDock(true); return true; }
+                break;
+            case KeyEvent.KEYCODE_DPAD_LEFT: case KeyEvent.KEYCODE_DPAD_RIGHT:
+                tilt(getCurrentFocus(), code == KeyEvent.KEYCODE_DPAD_LEFT ? -1 : 1, e.getRepeatCount() > 0);
                 break;
         }
-        return super.onKeyDown(code, e); // volume, mute, power, mic, settings, channel, app shortcuts: system handles
+        return super.onKeyDown(code, e); // volume, mute, power, mic, source, settings, channel, app shortcuts: system handles
+    }
+
+    @Override public boolean onKeyUp(int code, KeyEvent e) {
+        if (code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT) tilt(getCurrentFocus(), 0, false);
+        return super.onKeyUp(code, e);
+    }
+
+    /** Apple TV parallax: the focused tile leans a few degrees toward the direction being pressed. */
+    private void tilt(View v, int dir, boolean held) {
+        if (v == null || !(v.getTag() instanceof App)) return;
+        v.animate().rotationY(dir * (held ? 7f : 4f)).setDuration(dir == 0 ? 260 : 120)
+                .setInterpolator(dir == 0 ? SPRING : new DecelerateInterpolator()).start();
     }
 
     private boolean isOnFirstGridRow() {
@@ -173,81 +208,94 @@ public class MainActivity extends Activity {
     private void buildUi() {
         root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
+        wallLayer = new FrameLayout(this);
         wallBack = new ImageView(this); wallFront = new ImageView(this);
         for (ImageView v : new ImageView[]{wallBack, wallFront}) {
-            v.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            v.setVisibility(View.INVISIBLE);
-            root.addView(v, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            v.setScaleType(ImageView.ScaleType.CENTER_CROP); v.setVisibility(View.INVISIBLE);
+            wallLayer.addView(v, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         }
-        // Bottom scrim keeps the dock and labels readable on bright frames.
-        View scrim = new View(this);
-        scrim.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0x00000000, 0x66000000, 0xB3000000}));
-        FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(260), Gravity.BOTTOM);
-        root.addView(scrim, sp);
+        root.addView(wallLayer, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        // Scrims keep text readable on bright frames: a soft band at the top, a stronger one behind the dock.
+        View top = new View(this);
+        top.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0x66000000, 0x00000000}));
+        root.addView(top, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(140), Gravity.TOP));
+        View bottom = new View(this);
+        bottom.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0x00000000, 0x80000000, 0xCC000000}));
+        root.addView(bottom, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(280), Gravity.BOTTOM));
 
         // Top-left: clock, greeting + date
         LinearLayout topLeft = new LinearLayout(this); topLeft.setOrientation(LinearLayout.VERTICAL);
-        clock = text(44, true, 0xFFFFFFFF); greeting = text(15, false, 0xDDFFFFFF);
+        clock = text(44, true, 0xFFFFFFFF); greeting = text(15, false, 0xE6FFFFFF);
         topLeft.addView(clock); topLeft.addView(greeting);
         FrameLayout.LayoutParams tl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.START);
-        tl.setMargins(dp(40), dp(32), 0, 0);
+        tl.setMargins(dp(48), dp(32), 0, 0);
         root.addView(topLeft, tl);
 
-        // Top-right: pills
-        LinearLayout pills = new LinearLayout(this); pills.setOrientation(LinearLayout.HORIZONTAL);
-        View inputsPill = pill("Girişler");
+        // Top-right: icon pills that reveal their label on focus
+        pills = new LinearLayout(this); pills.setOrientation(LinearLayout.HORIZONTAL); pills.setClipChildren(false);
+        View inputsPill = pill(R.drawable.ic_hdmi, getString(R.string.inputs));
         inputsPill.setOnClickListener(v -> showInputs(v));
-        wifiText = null;
-        View wifiPill = pill("Wi-Fi"); wifiText = (TextView) ((LinearLayout) wifiPill).getChildAt(0);
+        View wifiPill = pill(R.drawable.ic_wifi, getString(R.string.wifi)); wifiLabel = (TextView) ((LinearLayout) wifiPill).getChildAt(1);
         wifiPill.setOnClickListener(v -> launch(new Intent(Settings.ACTION_WIFI_SETTINGS)));
-        View settingsPill = pill("Ayarlar");
+        View settingsPill = pill(R.drawable.ic_settings, getString(R.string.settings));
         settingsPill.setOnClickListener(v -> launch(new Intent(Settings.ACTION_SETTINGS)));
         for (View p : new View[]{inputsPill, wifiPill, settingsPill}) {
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(34));
             lp.setMarginStart(dp(8)); pills.addView(p, lp);
         }
         FrameLayout.LayoutParams pr = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.END);
-        pr.setMargins(0, dp(36), dp(40), 0);
+        pr.setMargins(0, dp(38), dp(48), 0);
         root.addView(pills, pr);
 
         // Focused app name above the dock
         focusedName = text(18, true, 0xFFFFFFFF);
         focusedName.setGravity(Gravity.CENTER_HORIZONTAL);
         FrameLayout.LayoutParams fn = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
-        fn.setMargins(0, 0, 0, dp(150));
+        fn.setMargins(0, 0, 0, dp(158));
         root.addView(focusedName, fn);
 
-        // Dock
+        // Dock: horizontal scroller, focused tile is scrolled to the centre
+        dockScroll = new HorizontalScrollView(this);
+        dockScroll.setHorizontalScrollBarEnabled(false); dockScroll.setFillViewport(true);
+        dockScroll.setClipChildren(false); dockScroll.setClipToPadding(false);
+        dockScroll.setFocusable(false); dockScroll.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
         dock = new LinearLayout(this); dock.setOrientation(LinearLayout.HORIZONTAL); dock.setGravity(Gravity.CENTER);
         dock.setClipChildren(false); dock.setClipToPadding(false);
+        dock.setPadding(dp(48), dp(24), dp(48), dp(24));
+        dockScroll.addView(dock, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         FrameLayout.LayoutParams dl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
-        dl.setMargins(dp(40), 0, dp(40), dp(56));
-        root.addView(dock, dl);
+        dl.setMargins(0, 0, 0, dp(40));
+        root.addView(dockScroll, dl);
 
-        hint = text(12, false, 0x99FFFFFF); hint.setText("▼  tüm uygulamalar"); hint.setGravity(Gravity.CENTER_HORIZONTAL);
+        hint = new LinearLayout(this); hint.setOrientation(LinearLayout.HORIZONTAL); hint.setGravity(Gravity.CENTER);
+        ImageView hi = new ImageView(this); hi.setImageResource(R.drawable.ic_apps); hi.setImageTintList(ColorStateList.valueOf(0x99FFFFFF));
+        hint.addView(hi, new LinearLayout.LayoutParams(dp(14), dp(14)));
+        TextView ht = text(12, false, 0x99FFFFFF); ht.setText(getString(R.string.all_apps)); ht.setPadding(dp(6), 0, 0, 0);
+        hint.addView(ht);
         FrameLayout.LayoutParams hl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
-        hl.setMargins(0, 0, 0, dp(18));
+        hl.setMargins(0, 0, 0, dp(16));
         root.addView(hint, hl);
 
         // All-apps panel (hidden until Down)
         gridPanel = new FrameLayout(this);
-        gridPanel.setBackgroundColor(0xCC0B1020);
+        gridPanel.setBackgroundColor(0xD90B1020);
         gridPanel.setVisibility(View.GONE);
         ScrollView scroll = new ScrollView(this); scroll.setClipChildren(false); scroll.setClipToPadding(false);
+        scroll.setVerticalScrollBarEnabled(false);
         LinearLayout column = new LinearLayout(this); column.setOrientation(LinearLayout.VERTICAL);
-        column.setPadding(dp(48), dp(40), dp(48), dp(40)); column.setClipChildren(false); column.setClipToPadding(false);
-        TextView h1 = text(13, false, 0xB3FFFFFF); h1.setText("Uygulamalar"); column.addView(h1);
+        column.setPadding(dp(48), dp(40), dp(48), dp(48)); column.setClipChildren(false); column.setClipToPadding(false);
+        TextView h1 = text(13, false, 0xB3FFFFFF); h1.setText(getString(R.string.apps)); column.addView(h1);
         grid = new GridLayout(this); grid.setColumnCount(getResources().getInteger(R.integer.columns));
         grid.setClipChildren(false); grid.setClipToPadding(false);
         LinearLayout.LayoutParams gl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        gl.topMargin = dp(10); column.addView(grid, gl);
-        TextView h2 = text(13, false, 0xB3FFFFFF); h2.setText("Girişler");
+        gl.topMargin = dp(12); column.addView(grid, gl);
+        TextView h2 = text(13, false, 0xB3FFFFFF); h2.setText(getString(R.string.inputs));
         LinearLayout.LayoutParams h2l = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         h2l.topMargin = dp(28); column.addView(h2, h2l);
         inputsRow = new LinearLayout(this); inputsRow.setOrientation(LinearLayout.HORIZONTAL);
         inputsRow.setClipChildren(false); inputsRow.setClipToPadding(false);
         LinearLayout.LayoutParams il = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        il.topMargin = dp(10); column.addView(inputsRow, il);
+        il.topMargin = dp(12); column.addView(inputsRow, il);
         scroll.addView(column);
         gridPanel.addView(scroll, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         root.addView(gridPanel, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -259,20 +307,29 @@ public class MainActivity extends Activity {
         TextView t = new TextView(this);
         t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp); t.setTextColor(color);
         t.setTypeface(Typeface.create("sans-serif" + (bold ? "-medium" : ""), Typeface.NORMAL));
-        t.setShadowLayer(6f, 0f, 2f, 0x80000000);
+        t.setShadowLayer(8f, 0f, 2f, 0x80000000);
         return t;
     }
 
-    /** Frosted pill: rounded translucent background, brighter when focused. */
-    private View pill(String label) {
+    /** Dark frosted pill with an icon; the label slides open when focused, the pill turns white. */
+    private View pill(int iconRes, String label) {
         LinearLayout p = new LinearLayout(this); p.setOrientation(LinearLayout.HORIZONTAL); p.setGravity(Gravity.CENTER_VERTICAL);
-        p.setPadding(dp(14), dp(7), dp(14), dp(7));
-        TextView t = text(13, false, 0xFFFFFFFF); t.setText(label); t.setShadowLayer(0, 0, 0, 0);
+        p.setPadding(dp(10), 0, dp(10), 0);
+        ImageView icon = new ImageView(this); icon.setImageResource(iconRes); icon.setImageTintList(ColorStateList.valueOf(0xFFFFFFFF));
+        p.addView(icon, new LinearLayout.LayoutParams(dp(18), dp(18)));
+        TextView t = text(13, false, 0xFF111111); t.setText(label); t.setShadowLayer(0, 0, 0, 0);
+        t.setPadding(dp(8), 0, 0, 0); t.setVisibility(View.GONE);
         p.addView(t);
         p.setFocusable(true); p.setClickable(true);
-        GradientDrawable bg = new GradientDrawable(); bg.setCornerRadius(dp(20)); bg.setColor(0x33FFFFFF);
+        GradientDrawable bg = new GradientDrawable(); bg.setCornerRadius(dp(17)); bg.setColor(0x8C0A0E1E);
         p.setBackground(bg);
-        p.setOnFocusChangeListener((v, f) -> { bg.setColor(f ? 0xE6FFFFFF : 0x33FFFFFF); t.setTextColor(f ? 0xFF111111 : 0xFFFFFFFF); });
+        p.setOnFocusChangeListener((v, f) -> {
+            bg.setColor(f ? 0xF2FFFFFF : 0x8C0A0E1E);
+            icon.setImageTintList(ColorStateList.valueOf(f ? 0xFF111111 : 0xFFFFFFFF));
+            if (f) { t.setAlpha(0f); t.setVisibility(View.VISIBLE); t.animate().alpha(1f).setDuration(180).start(); }
+            else t.setVisibility(View.GONE);
+            v.animate().scaleX(f ? 1.06f : 1f).scaleY(f ? 1.06f : 1f).setDuration(200).setInterpolator(SPRING).start();
+        });
         return p;
     }
 
@@ -302,32 +359,30 @@ public class MainActivity extends Activity {
     private void fillDock() {
         String focusedPkg = lastDockFocus != null && lastDockFocus.getTag() instanceof App ? ((App) lastDockFocus.getTag()).pkg : null;
         dock.removeAllViews(); lastDockFocus = null;
-        for (String pkg : getResources().getStringArray(R.array.dock_apps)) {
-            App a = find(pkg); if (a == null) continue;
-            View tile = tile(a, dp(118), dp(66));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(118), dp(66)); lp.setMargins(dp(9), 0, dp(9), 0);
+        List<App> order = new ArrayList<>();
+        for (String pkg : getResources().getStringArray(R.array.dock_apps)) { App a = find(pkg); if (a != null) order.add(a); }
+        if (order.isEmpty()) order = apps.subList(0, Math.min(7, apps.size())); // nothing configured is installed
+        int w = dp(112), h = dp(63);
+        for (App a : order) {
+            View tile = tile(a, w, h);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(w, h); lp.setMargins(dp(7), 0, dp(7), 0);
             dock.addView(tile, lp);
-            if (lastDockFocus == null || pkg.equals(focusedPkg)) lastDockFocus = tile;
-        }
-        if (dock.getChildCount() == 0) for (App a : apps.subList(0, Math.min(7, apps.size()))) { // no configured dock app installed
-            View tile = tile(a, dp(118), dp(66));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(118), dp(66)); lp.setMargins(dp(9), 0, dp(9), 0);
-            dock.addView(tile, lp); if (lastDockFocus == null) lastDockFocus = tile;
+            if (lastDockFocus == null || a.pkg.equals(focusedPkg)) lastDockFocus = tile;
         }
     }
 
     private void fillGrid() {
         grid.removeAllViews();
         int cols = grid.getColumnCount();
-        int cell = (getResources().getDisplayMetrics().widthPixels - dp(96) - dp(16) * cols) / cols;
+        int cell = (getResources().getDisplayMetrics().widthPixels - dp(96) - dp(18) * cols) / cols;
         for (App a : apps) {
             View tile = tile(a, cell, cell * 9 / 16);
-            GridLayout.LayoutParams lp = new GridLayout.LayoutParams(); lp.width = cell; lp.height = cell * 9 / 16; lp.setMargins(dp(8), dp(8), dp(8), dp(8));
+            GridLayout.LayoutParams lp = new GridLayout.LayoutParams(); lp.width = cell; lp.height = cell * 9 / 16; lp.setMargins(dp(9), dp(9), dp(9), dp(9));
             grid.addView(tile, lp);
         }
     }
 
-    /** 16:9 rounded tile showing the app banner; scales up with a white outline when focused. */
+    /** 16:9 rounded tile with the app banner. Focus = spring scale + soft shadow, no ring. */
     private View tile(App a, int w, int h) {
         FrameLayout card = new FrameLayout(this);
         card.setTag(a); card.setFocusable(true); card.setClickable(true);
@@ -338,44 +393,68 @@ public class MainActivity extends Activity {
             @Override public void getOutline(View v, Outline o) { o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), dp(8)); }
         });
         card.setClipToOutline(true);
-        GradientDrawable ring = new GradientDrawable(); ring.setCornerRadius(dp(8)); ring.setStroke(dp(3), 0x00FFFFFF); ring.setColor(0);
-        card.setForeground(ring);
+        card.setCameraDistance(8000 * getResources().getDisplayMetrics().density);
         card.setOnFocusChangeListener((v, f) -> {
-            ring.setStroke(dp(3), f ? 0xFFFFFFFF : 0x00FFFFFF);
-            ObjectAnimator.ofPropertyValuesHolder(v, PropertyValuesHolder.ofFloat(View.SCALE_X, f ? 1.16f : 1f), PropertyValuesHolder.ofFloat(View.SCALE_Y, f ? 1.16f : 1f))
-                    .setDuration(140).start();
-            v.setElevation(f ? dp(8) : 0);
-            if (f) { focusedName.setText(a.label); if (v.getParent() == dock) lastDockFocus = v; }
+            v.animate().scaleX(f ? FOCUS_SCALE : 1f).scaleY(f ? FOCUS_SCALE : 1f).rotationY(0f)
+                    .setDuration(f ? 260 : 180).setInterpolator(f ? SPRING : new DecelerateInterpolator()).start();
+            ObjectAnimator.ofFloat(v, "elevation", f ? dp(14) : 0f).setDuration(200).start();
+            if (f && v.getParent() == dock) { // the grid shows no floating name
+                setFocusedName(a.label);
+                lastDockFocus = v; centerInDock(v);
+            }
         });
-        card.setOnClickListener(v -> launch(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
-                .setComponent(a.component).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)));
+        card.setOnClickListener(v -> {
+            // Apple TV press: quick dip then launch
+            v.animate().scaleX(FOCUS_SCALE * 0.94f).scaleY(FOCUS_SCALE * 0.94f).setDuration(70).withEndAction(() ->
+                    v.animate().scaleX(FOCUS_SCALE).scaleY(FOCUS_SCALE).setDuration(120).start()).start();
+            launch(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
+                    .setComponent(a.component).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED));
+        });
         return card;
     }
 
+    private void setFocusedName(String name) {
+        if (name.equals(String.valueOf(focusedName.getText())) && focusedName.getAlpha() == 1f) return;
+        focusedName.animate().cancel();
+        focusedName.setAlpha(0f); focusedName.setTranslationY(dp(6)); focusedName.setText(name);
+        focusedName.animate().alpha(1f).translationY(0f).setDuration(220).setInterpolator(new DecelerateInterpolator()).start();
+    }
+
+    private void centerInDock(View tile) {
+        int target = tile.getLeft() + tile.getWidth() / 2 - dockScroll.getWidth() / 2;
+        dockScroll.smoothScrollTo(Math.max(0, target), 0);
+    }
+
     private void launch(Intent i) {
-        try { startActivity(i); } catch (RuntimeException e) { focusedName.setText("Açılamadı"); }
+        try { startActivity(i); } catch (RuntimeException e) { setFocusedName(getString(R.string.could_not_open)); }
     }
 
     // ---------- dock / grid switching ----------
 
-    private void showDock() {
-        gridPanel.setVisibility(View.GONE);
-        dock.setVisibility(View.VISIBLE); focusedName.setVisibility(View.VISIBLE); hint.setVisibility(View.VISIBLE);
+    private void showDock(boolean animate) {
+        if (gridPanel.getVisibility() == View.VISIBLE && animate) {
+            gridPanel.animate().alpha(0f).translationY(dp(40)).setDuration(220).setInterpolator(new AccelerateDecelerateInterpolator())
+                    .withEndAction(() -> gridPanel.setVisibility(View.GONE)).start();
+        } else gridPanel.setVisibility(View.GONE);
+        for (View v : new View[]{dockScroll, focusedName, hint, pills}) {
+            v.setVisibility(View.VISIBLE);
+            if (animate) v.animate().alpha(1f).setDuration(220).start(); else v.setAlpha(1f);
+        }
         View f = lastDockFocus != null ? lastDockFocus : dock.getChildAt(0);
         if (f != null) f.requestFocus();
     }
 
     private void showGrid() {
-        gridPanel.setAlpha(0f); gridPanel.setVisibility(View.VISIBLE);
-        gridPanel.animate().alpha(1f).setDuration(180).setInterpolator(new DecelerateInterpolator()).start();
-        focusedName.setVisibility(View.INVISIBLE); hint.setVisibility(View.INVISIBLE);
+        gridPanel.setAlpha(0f); gridPanel.setTranslationY(dp(40)); gridPanel.setVisibility(View.VISIBLE);
+        gridPanel.animate().alpha(1f).translationY(0f).setDuration(280).setInterpolator(new DecelerateInterpolator(1.8f)).start();
+        for (View v : new View[]{focusedName, hint, pills}) v.animate().alpha(0f).setDuration(160).start();
         if (grid.getChildCount() > 0) grid.getChildAt(0).requestFocus();
-        dock.setVisibility(View.INVISIBLE); // after focus moved, so the dock tile's focus listener doesn't fire
+        dockScroll.animate().alpha(0f).setDuration(160).withEndAction(() -> dockScroll.setVisibility(View.INVISIBLE)).start();
     }
 
     // ---------- inputs ----------
 
-    private static final class Input { final String label; final Runnable open; Input(String l, Runnable o) { label = l; open = o; } }
+    private static final class Input { final String label; final int icon; final Runnable open; Input(String l, int i, Runnable o) { label = l; icon = i; open = o; } }
 
     private List<Input> inputs() {
         List<Input> list = new ArrayList<>();
@@ -383,14 +462,14 @@ public class MainActivity extends Activity {
         Intent live = getPackageManager().getLeanbackLaunchIntentForPackage(liveTv);
         if (live == null) live = getPackageManager().getLaunchIntentForPackage(liveTv);
         final boolean hasTvApp = live != null;
-        if (hasTvApp) { final Intent li = live; list.add(new Input("Canlı TV", () -> launch(li))); }
+        if (hasTvApp) { final Intent li = live; list.add(new Input(getString(R.string.live_tv), R.drawable.ic_live_tv, () -> launch(li))); }
         TvInputManager tim = (TvInputManager) getSystemService(Context.TV_INPUT_SERVICE);
         if (tim != null) for (TvInputInfo t : tim.getTvInputList()) {
             if (!t.isPassthroughInput()) continue;
-            CharSequence custom = t.loadCustomLabel(this), name = t.loadLabel(this); // custom = the name the owner gave the input (e.g. "PS5")
+            CharSequence custom = t.loadCustomLabel(this), name = t.loadLabel(this); // custom = the name the owner gave the input (e.g. "PlayStation 5")
             String label = custom != null && custom.length() > 0 ? custom.toString() : name == null ? t.getId() : name.toString();
             final String id = t.getId();
-            list.add(new Input(label, () -> {
+            list.add(new Input(label, R.drawable.ic_hdmi, () -> {
                 Intent i = new Intent(Intent.ACTION_VIEW, TvContract.buildChannelUriForPassthroughInput(id));
                 if (hasTvApp) i.setPackage(liveTv); // the TV app renders passthrough inputs
                 try { startActivity(i); } catch (RuntimeException e) {
@@ -402,33 +481,45 @@ public class MainActivity extends Activity {
         return list;
     }
 
+    /** Pill variant whose label is always visible, for the inputs row and popup. */
+    private View inputPill(Input in) {
+        View p = pill(in.icon, in.label);
+        TextView t = (TextView) ((LinearLayout) p).getChildAt(1);
+        t.setVisibility(View.VISIBLE); t.setTextColor(0xFFFFFFFF);
+        View.OnFocusChangeListener base = p.getOnFocusChangeListener();
+        p.setOnFocusChangeListener((v, f) -> { base.onFocusChange(v, f); t.setVisibility(View.VISIBLE); t.setAlpha(1f); t.setTextColor(f ? 0xFF111111 : 0xFFFFFFFF); });
+        p.setOnClickListener(v -> in.open.run());
+        return p;
+    }
+
     private void fillInputsRow() {
         inputsRow.removeAllViews();
         for (Input in : inputs()) {
-            View p = pill(in.label); p.setOnClickListener(v -> in.open.run());
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            View p = inputPill(in);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(36));
             lp.setMarginEnd(dp(10)); inputsRow.addView(p, lp);
         }
     }
 
     private void showInputs(View anchor) {
         if (inputsPopup != null && inputsPopup.isShowing()) { inputsPopup.dismiss(); return; }
+        List<Input> ins = inputs();
+        if (ins.isEmpty()) { launch(new Intent(Settings.ACTION_SETTINGS)); return; }
         LinearLayout list = new LinearLayout(this); list.setOrientation(LinearLayout.VERTICAL);
         list.setPadding(dp(8), dp(8), dp(8), dp(8));
-        GradientDrawable bg = new GradientDrawable(); bg.setCornerRadius(dp(14)); bg.setColor(0xF2151B2E);
+        GradientDrawable bg = new GradientDrawable(); bg.setCornerRadius(dp(16)); bg.setColor(0xF2151B2E);
         list.setBackground(bg);
-        List<Input> ins = inputs();
-        if (ins.isEmpty()) { Intent s = new Intent(Settings.ACTION_SETTINGS); launch(s); return; }
         for (Input in : ins) {
-            View p = pill(in.label);
+            View p = inputPill(in);
             p.setOnClickListener(v -> { inputsPopup.dismiss(); in.open.run(); });
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(36));
             lp.setMargins(0, dp(3), 0, dp(3)); list.addView(p, lp);
         }
-        inputsPopup = new PopupWindow(list, dp(240), ViewGroup.LayoutParams.WRAP_CONTENT, true);
-        inputsPopup.setElevation(dp(12));
+        inputsPopup = new PopupWindow(list, dp(250), ViewGroup.LayoutParams.WRAP_CONTENT, true);
+        inputsPopup.setElevation(dp(16));
+        inputsPopup.setAnimationStyle(android.R.style.Animation_Dialog);
         if (anchor != null) inputsPopup.showAsDropDown(anchor, 0, dp(8));
-        else inputsPopup.showAtLocation(root, Gravity.TOP | Gravity.END, dp(40), dp(80));
+        else inputsPopup.showAtLocation(root, Gravity.TOP | Gravity.END, dp(48), dp(84));
         list.getChildAt(0).requestFocus();
     }
 
@@ -438,16 +529,16 @@ public class MainActivity extends Activity {
         Date now = new Date();
         clock.setText(timeFmt.format(now));
         int h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
-        String hello = h < 6 ? "İyi geceler" : h < 12 ? "Günaydın" : h < 18 ? "İyi günler" : "İyi akşamlar";
-        greeting.setText(hello + ", " + getString(R.string.owner_name) + "  ·  " + dateFmt.format(now));
-        if (wifiText != null) {
+        int hello = h < 6 ? R.string.greeting_night : h < 12 ? R.string.greeting_morning : h < 18 ? R.string.greeting_day : R.string.greeting_evening;
+        greeting.setText(getString(hello) + ", " + getString(R.string.owner_name) + "  ·  " + dateFmt.format(now));
+        if (wifiLabel != null) {
             String ssid = null;
             try {
                 WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
                 String s = wm.getConnectionInfo().getSSID();
                 if (s != null && !s.equals("<unknown ssid>")) ssid = s.replace("\"", "");
             } catch (RuntimeException ignored) { }
-            wifiText.setText(ssid == null ? "Wi-Fi" : ssid);
+            wifiLabel.setText(ssid == null ? getString(R.string.wifi) : ssid);
         }
     }
 }
