@@ -512,7 +512,7 @@ public class MainActivity extends Activity {
             gridPanel.animate().alpha(0f).translationY(dp(40)).setDuration(220).setInterpolator(new AccelerateDecelerateInterpolator())
                     .withEndAction(() -> gridPanel.setVisibility(View.GONE)).start();
         } else gridPanel.setVisibility(View.GONE);
-        for (View v : new View[]{dockScroll, focusedName, hint, pills}) {
+        for (View v : new View[]{dockScroll, focusedName, hint, pills, clock, greeting}) {
             v.setVisibility(View.VISIBLE);
             if (animate) v.animate().alpha(1f).setDuration(220).start(); else v.setAlpha(1f);
         }
@@ -524,7 +524,8 @@ public class MainActivity extends Activity {
     private void showGrid() {
         gridPanel.setAlpha(0f); gridPanel.setTranslationY(dp(40)); gridPanel.setVisibility(View.VISIBLE);
         gridPanel.animate().alpha(1f).translationY(0f).setDuration(280).setInterpolator(new DecelerateInterpolator(1.8f)).start();
-        for (View v : new View[]{focusedName, hint, pills}) v.animate().alpha(0f).setDuration(160).start();
+        // everything of the home layer goes, the clock and greeting too: the grid's backdrop is translucent
+        for (View v : new View[]{focusedName, hint, pills, clock, greeting}) v.animate().alpha(0f).setDuration(160).start();
         prevFocus = null; // programmatic move, no sound
         if (grid.getChildCount() > 0) grid.getChildAt(0).requestFocus();
         dockScroll.animate().alpha(0f).setDuration(160).withEndAction(() -> dockScroll.setVisibility(View.INVISIBLE)).start();
