@@ -1,0 +1,1 @@
+com.tcl.guard   # Safety Guard cleaner; manages apps Auto Launch permission

@@ -1,0 +1,692 @@
+{
+ "taken": "20261019-123802",
+ "label": "before-sleep",
+ "home": "com.google.android.apps.tv.launcherx/.home.HomeActivity",
+ "mem": {
+  "total_mb": 2048,
+  "available_mb": 612,
+  "swap_used_mb": 106
+ },
+ "packages": {
+  "android": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "android.autoinstalls.config.google.gtvpai": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "au.com.stan.and": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.amazon.amazonvideo.livingroom": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.backupconfirm": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.bluetooth": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.camera2": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.android.captiveportallogin": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.certinstaller": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.companiondevicemanager": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.cts.ctsshim": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.cts.priv.ctsshim": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.dreams.basic": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.dynsystem": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.externalstorage": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.hotspot2.osulogin": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.htmlviewer": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.inputdevices": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.keychain": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.localtransport": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.location.fused": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.messaging": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.android.networkstack.inprocess": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.networkstack.permissionconfig": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.networkstack.tethering.inprocess": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.pacprocessor": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.printspooler": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.android.providers.calendar": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.android.providers.contacts": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.providers.downloads": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.providers.media": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.providers.media.module": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.providers.settings": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.providers.tv": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.providers.userdictionary": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.proxyhandler": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.se": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.settings.intelligence": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.sharedstoragebackup": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.shell": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.soundpicker": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.statementservice": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.systemui": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.tethering.overlay": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.tethering.overlay.gsi": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.tv.settings": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.tv.settings.google.resoverlay": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.tv.settings.vendor.resoverlay": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.vending": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.vpndialogs": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.wallpaperbackup": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.android.wifi.resources": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.apple.atve.androidtv.appletv": {
+   "system": false,
+   "enabled": true,
+   "installer": "com.android.vending"
+  },
+  "com.disney.disneyplus": {
+   "system": false,
+   "enabled": true,
+   "installer": "com.android.vending"
+  },
+  "com.google.android.apps.mediashell": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.apps.nbu.smartconnect.tv": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.google.android.apps.tv.dreamx": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.apps.tv.launcherx": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.ext.services": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.ext.shared": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.feedback": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.google.android.gms": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.gsf": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.inputmethod.latin": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.katniss": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.marvin.talkback": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.modulemetadata": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.onetimeinitializer": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.overlay.modules.ext.services": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.overlay.modules.modulemetadata.forframework": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.overlay.modules.permissioncontroller": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.overlay.modules.permissioncontroller.forframework": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.packageinstaller": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.partnersetup": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.google.android.permissioncontroller": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.play.games": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.google.android.sss.authbridge": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.syncadapters.calendar": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.google.android.tts": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.tungsten.setupwraith": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.tv.assistant": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.tv.frameworkpackagestubs": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.tv.remote.service": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.videos": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.webview": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.youtube.tv": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.google.android.youtube.tvmusic": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.kick.mobile": {
+   "system": false,
+   "enabled": true,
+   "installer": "com.android.vending"
+  },
+  "com.netflix.ninja": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.phlox.tvwebbrowser": {
+   "system": false,
+   "enabled": true,
+   "installer": "com.android.vending"
+  },
+  "com.tcl.android.webview": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.tcl.assistant": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.tcl.autopair": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.tcl.bi": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.tcl.browser": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.tcl.channelplus": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.tcl.dashboard": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.tcl.esticker": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.tcl.factory.view": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.tcl.gallery": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.tcl.gamebar": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.tcl.guard": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.tcl.hearaid": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.tcl.initsetup": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.tcl.inputmethod.international": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.tcl.keyhelp": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.tcl.logkit": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.tcl.magiconnectfree": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.tcl.messagebox": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.tcl.micmanager": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.tcl.miracast": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.tcl.ocean.instructions": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.tcl.overseasappshow": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.tcl.partnercustomizer": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.tcl.providers.config": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.tcl.settings": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.tcl.smartalexa": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.tcl.suspension": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.tcl.system.server": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.tcl.t_solo": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.tcl.tcl_bt_rcu_service": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.tcl.tclchannel.overlay": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.tcl.ttvs": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.tcl.tv": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.tcl.tv.tclhome_passive": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.tcl.tvinput": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.tcl.ui_mediaCenter": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.tcl.useragreement": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.tcl.usercenter": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  },
+  "com.tcl.versionUpdateApp": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.tcl.waterfall.overseas": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.turkcell.ott": {
+   "system": false,
+   "enabled": true,
+   "installer": "com.android.vending"
+  },
+  "com.tvos": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "com.wbd.stream": {
+   "system": false,
+   "enabled": true,
+   "installer": "com.android.vending"
+  },
+  "org.chromium.webview_shell": {
+   "system": true,
+   "enabled": true,
+   "installer": null
+  },
+  "tv.wuaki.apptv": {
+   "system": true,
+   "enabled": false,
+   "installer": null
+  }
+ }
+}
