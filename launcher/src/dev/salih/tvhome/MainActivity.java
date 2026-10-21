@@ -80,7 +80,10 @@ public class MainActivity extends Activity {
 
     private FrameLayout root, wallLayer, gridPanel;
     private ImageView wallBack, wallFront;
-    private TextView clock, greeting, focusedName, wifiLabel;
+    private TextView clock, greeting, focusedName, wifiLabel, weatherText;
+    private ImageView weatherIcon;
+    private View weatherPill;
+    private int wallpaperMinutes;
     private HorizontalScrollView dockScroll;
     private LinearLayout dock, inputsRow, pills, hint;
     private GridLayout grid;
@@ -100,11 +103,15 @@ public class MainActivity extends Activity {
         dateFmt = new SimpleDateFormat("d MMMM EEEE", getResources().getConfiguration().getLocales().get(0));
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                 | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
-        prefs = getSharedPreferences("home", MODE_PRIVATE);
+        Watchdog.install(this);
+        prefs = getSharedPreferences(Sky.PREFS, MODE_PRIVATE);
+        Context app = getApplicationContext();
+        Wallpapers.sun = t -> Sky.slot(app, t);   // real sunrise/sunset once the weather has been fetched
         buildUi();
         setContentView(root);
         int w = getResources().getDisplayMetrics().widthPixels, h = getResources().getDisplayMetrics().heightPixels;
-        wallpapers = new Wallpapers(this, wallBack, wallFront, handler, getResources().getInteger(R.integer.wallpaper_minutes), w, h);
+        wallpaperMinutes = wallpaperMinutes();
+        wallpapers = new Wallpapers(this, wallBack, wallFront, handler, wallpaperMinutes, w, h);
         loadApps();
         gridOnResume = KeyService.ACTION_SHOW_APPS.equals(getIntent().getAction());
         // First paint: UI fades in over the wallpaper instead of popping.
@@ -124,6 +131,14 @@ public class MainActivity extends Activity {
             f.addDataScheme("package");
             registerReceiver(packageReceiver, f); receiverRegistered = true;
         }
+        if (wallpaperMinutes != wallpaperMinutes()) {   // changed in Home settings
+            wallpapers.stop(); wallpaperMinutes = wallpaperMinutes();
+            int w = getResources().getDisplayMetrics().widthPixels, h = getResources().getDisplayMetrics().heightPixels;
+            wallpapers = new Wallpapers(this, wallBack, wallFront, handler, wallpaperMinutes, w, h);
+            wallpapers.start();
+        }
+        updateWeather();
+        Sky.refresh(this, false, this::updateWeather);
         loadApps(); // picks up installs that happened while another app was in front
         if (gridOnResume) { gridOnResume = false; showGrid(); } else showDock(false);
     }
@@ -160,6 +175,7 @@ public class MainActivity extends Activity {
         @Override public void run() {
             updateClock();
             wallpapers.onMinute();
+            Sky.refresh(MainActivity.this, false, MainActivity.this::updateWeather);
             long now = System.currentTimeMillis();
             handler.postDelayed(this, 60_000 - now % 60_000 + 50);
         }
@@ -251,7 +267,9 @@ public class MainActivity extends Activity {
         wifiPill.setOnClickListener(v -> launch(new Intent(Settings.ACTION_WIFI_SETTINGS)));
         View settingsPill = pill(R.drawable.ic_settings, getString(R.string.settings));
         settingsPill.setOnClickListener(v -> launch(new Intent(Settings.ACTION_SETTINGS)));
-        for (View p : new View[]{inputsPill, wifiPill, settingsPill}) {
+        settingsPill.setOnLongClickListener(v -> { launch(new Intent(this, SettingsActivity.class)); return true; });
+        weatherPill = weatherPill();
+        for (View p : new View[]{weatherPill, inputsPill, wifiPill, settingsPill}) {
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(34));
             lp.setMarginStart(dp(8)); pills.addView(p, lp);
         }
@@ -356,7 +374,8 @@ public class MainActivity extends Activity {
         Set<String> seen = new HashSet<>();
         for (ResolveInfo ri : pm.queryIntentActivities(q, 0)) {
             String pkg = ri.activityInfo.packageName;
-            if (hidden.contains(pkg) || !seen.add(pkg)) continue;
+            boolean ourSettings = ri.activityInfo.name.equals(SettingsActivity.class.getName());
+            if ((hidden.contains(pkg) && !ourSettings) || !seen.add(pkg)) continue;
             Drawable banner = ri.activityInfo.loadBanner(pm);
             if (banner == null) banner = ri.activityInfo.applicationInfo.loadBanner(pm);
             if (banner == null) banner = ri.loadIcon(pm);
@@ -589,6 +608,55 @@ public class MainActivity extends Activity {
         if (anchor != null) inputsPopup.showAsDropDown(anchor, 0, dp(8));
         else inputsPopup.showAtLocation(root, Gravity.TOP | Gravity.END, dp(48), dp(84));
         list.getChildAt(0).requestFocus();
+    }
+
+    // ---------- weather ----------
+
+    private int wallpaperMinutes() { return prefs.getInt("wallpaper_minutes", getResources().getInteger(R.integer.wallpaper_minutes)); }
+
+    /** Icon and temperature; focused, it also names the weather and the city. OK opens Home settings. */
+    private View weatherPill() {
+        LinearLayout p = new LinearLayout(this); p.setOrientation(LinearLayout.HORIZONTAL); p.setGravity(Gravity.CENTER_VERTICAL);
+        p.setPadding(dp(10), 0, dp(12), 0);
+        weatherIcon = new ImageView(this); weatherIcon.setImageTintList(ColorStateList.valueOf(0xFFFFFFFF));
+        p.addView(weatherIcon, new LinearLayout.LayoutParams(dp(18), dp(18)));
+        weatherText = text(13, false, 0xFFFFFFFF); weatherText.setShadowLayer(0, 0, 0, 0); weatherText.setPadding(dp(6), 0, 0, 0);
+        p.addView(weatherText);
+        p.setFocusable(true); p.setClickable(true);
+        GradientDrawable bg = new GradientDrawable(); bg.setCornerRadius(dp(17)); bg.setColor(0x8C0A0E1E); p.setBackground(bg);
+        p.setOnFocusChangeListener((v, f) -> {
+            if (f) prevFocus = v;
+            bg.setColor(f ? 0xF2FFFFFF : 0x8C0A0E1E);
+            weatherIcon.setImageTintList(ColorStateList.valueOf(f ? 0xFF111111 : 0xFFFFFFFF));
+            weatherText.setTextColor(f ? 0xFF111111 : 0xFFFFFFFF);
+            updateWeather();
+            v.animate().scaleX(f ? 1.06f : 1f).scaleY(f ? 1.06f : 1f).setDuration(200).setInterpolator(SPRING).start();
+        });
+        p.setOnClickListener(v -> launch(new Intent(this, SettingsActivity.class)));
+        p.setVisibility(View.GONE);   // until the first forecast arrives
+        return p;
+    }
+
+    private void updateWeather() {
+        if (weatherPill == null) return;
+        Integer t = Sky.temperature(this);
+        if (t == null) {
+            if (!Sky.city(this).isEmpty()) { weatherPill.setVisibility(View.GONE); return; }   // fetching or offline
+            // no city yet (the TV's time zone names none): ask for one, OK opens Home settings
+            weatherIcon.setImageResource(R.drawable.ic_w_partly_cloudy_day);
+            weatherText.setText(R.string.set_city);
+            weatherPill.setVisibility(View.VISIBLE);
+            return;
+        }
+        int code = Sky.code(this);
+        weatherIcon.setImageResource(Sky.icon(code, Sky.isDay(this)));
+        String text = t + "°";
+        if (weatherPill.hasFocus() || weatherPill.isFocused()) {
+            String city = Sky.city(this);
+            text += "  " + getString(Sky.label(code)) + (city.isEmpty() ? "" : "  ·  " + city);
+        }
+        weatherText.setText(text);
+        weatherPill.setVisibility(View.VISIBLE);
     }
 
     // ---------- clock / wifi ----------

@@ -61,7 +61,13 @@ final class Wallpapers {
         return -1;
     }
 
+    /** Real sunrise/sunset slots when the launcher knows them (Sky); fixed hours otherwise. Null = fixed hours. */
+    static volatile java.util.function.LongFunction<String> sun;
+
     static String slotFor(Calendar c) {
+        java.util.function.LongFunction<String> s = sun;
+        String real = s == null ? null : s.apply(c.getTimeInMillis());
+        if (real != null) return real;
         int h = c.get(Calendar.HOUR_OF_DAY);
         if (h >= 6 && h < 10) return "sabah";
         if (h >= 10 && h < 17) return "gunduz";

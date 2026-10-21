@@ -5,7 +5,6 @@ import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
-import android.util.SparseArray;
 import android.util.SparseBooleanArray;
 import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityEvent;
@@ -14,29 +13,24 @@ import android.view.accessibility.AccessibilityEvent;
  * Remote app buttons (Netflix, YouTube, ...). On this Google TV build the manufacturer's key handler only forwards
  * them to the stock Google TV home, which is asleep so this launcher can be Home; without a receiver the buttons
  * do nothing. Key filtering runs before that handler, so the buttons are taken here and the app opened directly.
- * Mapping: R.array.app_keys ("keycode|package", or "keycode|@apps" for the all-apps grid). Other keys pass through.
+ * Mapping: Home settings (SettingsActivity.keyTarget), defaults from R.array.app_keys ("keycode|package", "@apps" for
+ * the all-apps grid, "@off" to leave the key to the TV). Other keys pass through.
  */
 public final class KeyService extends AccessibilityService {
     static final String ACTION_SHOW_APPS = "dev.salih.tvhome.action.SHOW_APPS";
     private static final String NETFLIX = "com.netflix.ninja";
     private static final int FLAG_REORDER_TO_FRONT = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT;
 
-    private final SparseArray<String> map = new SparseArray<>();
     private final SparseBooleanArray taken = new SparseBooleanArray();   // keycodes whose DOWN we consumed
+    private android.content.SharedPreferences prefs;
 
-    @Override protected void onServiceConnected() {
-        map.clear();
-        for (String item : getResources().getStringArray(R.array.app_keys)) {
-            String[] p = item.split("\\|", 2);
-            if (p.length != 2) continue;
-            try { map.put(Integer.parseInt(p[0].trim()), p[1].trim()); } catch (NumberFormatException ignored) { }
-        }
-    }
+    @Override protected void onServiceConnected() { prefs = getSharedPreferences(Sky.PREFS, MODE_PRIVATE); }
 
     @Override protected boolean onKeyEvent(KeyEvent e) {
         int code = e.getKeyCode();
-        String target = map.get(code);
-        if (target == null) return false;
+        if (code < 4000 || prefs == null) return false;   // TCL's app buttons are 40xx/41xx; everything else passes untouched
+        String target = SettingsActivity.keyTarget(prefs, getResources(), code);
+        if (target.equals("@off")) return false;
         if (e.getAction() == KeyEvent.ACTION_DOWN) {
             if (e.getRepeatCount() == 0) taken.put(code, open(target));
             return taken.get(code);

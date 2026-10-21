@@ -6,6 +6,8 @@
 
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Weather and sunrise/sunset from Open-Meteo (Sky), and the TV's own ADB on 127.0.0.1 (Adb). -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- Android 11 only reveals the Wi-Fi name to apps holding location; granted over ADB at install. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
@@ -21,6 +23,10 @@
         <package android:name="com.tcl.suspension" />
         <!-- remote app buttons (KeyService) -->
         <package android:name="com.netflix.ninja" />
+        <!-- Home settings shows which Home and screensaver are on -->
+        <package android:name="com.google.android.apps.tv.launcherx" />
+        <package android:name="com.google.android.tungsten.setupwraith" />
+        <package android:name="com.google.android.apps.tv.dreamx" />
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="market" />
@@ -50,6 +56,40 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <!-- Home settings: in the all-apps grid (and the TV's own app list), long-press Settings on Home. -->
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="true"
+            android:label="@string/home_settings"
+            android:banner="@drawable/ic_home_settings"
+            android:icon="@drawable/ic_home_settings"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|uiMode|density|locale">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Screensaver (Dream); chosen in Home settings. -->
+        <service
+            android:name=".Dream"
+            android:exported="true"
+            android:label="@string/dream_label"
+            android:permission="android.permission.BIND_DREAM_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.dreams.DreamService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+
+        <!-- Crash watchdog's way out, in its own process so a crashing Home can't stop it. -->
+        <service
+            android:name=".Watchdog$Rescue"
+            android:exported="false"
+            android:process=":rescue"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
 
         <!-- Remote app buttons; enabled once over ADB (see README). -->
         <service
