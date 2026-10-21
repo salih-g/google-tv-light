@@ -261,11 +261,51 @@
       return true;
     },
     pollVideo: function () {
-      var v = document.querySelector("video");
+      var v = playingVideo() || document.querySelector("video");
       var rep = v ? [v.paused ? 0 : 1, Math.round(v.currentTime), Math.round(v.duration || 0), v.playbackRate, document.title].join("|") : "";
       if (rep !== lastVideoReport) { lastVideoReport = rep; tvbridge.video(rep); }
+    },
+
+    // Real fullscreen for a video the user started: unmuted and longer than a clip (muted hero loops and short ads
+    // stay put), each video once (Back out of it and it stays inline). Returns "yes" and arms the F12 handler below;
+    // the app then sends a real F12 key, because requestFullscreen needs a user gesture and script calls aren't one.
+    wantFullscreen: function () {
+      var v = playingVideo();
+      if (!v || document.fullscreenElement || v.muted || v.volume === 0) return "no";
+      var mediaDocument = (document.contentType || "").indexOf("video/") === 0;   // the address is the video file itself
+      if (!mediaDocument && isFinite(v.duration) && v.duration > 0 && v.duration <= 30) return "no";
+      var key = v.currentSrc || v.src || "";
+      if (fullscreened.indexOf(key) >= 0) return "no";
+      fullscreened.push(key); armedVideo = v;
+      return "yes";
     }
   };
+
+  // ---------- video fullscreen ----------
+
+  var fullscreened = [], armedVideo = null, savedControls = null;
+
+  function playingVideo() {
+    var list = document.querySelectorAll("video");
+    for (var i = 0; i < list.length; i++) if (!list[i].paused && !list[i].ended && list[i].readyState > 2) return list[i];
+    return null;
+  }
+
+  // The app's F12 arrives as a trusted key event, so requestFullscreen is allowed here. The page's own controls go
+  // away while the app's video HUD is on screen (one control set), and come back when fullscreen ends.
+  addEventListener("keydown", function (e) {
+    if (e.key !== "F12" || !armedVideo) return;
+    var v = armedVideo; armedVideo = null;
+    e.preventDefault(); e.stopImmediatePropagation();
+    savedControls = { video: v, controls: v.controls };
+    v.controls = false;
+    var go = v.requestFullscreen || v.webkitRequestFullscreen;
+    try { var p = go.call(v); if (p && p.catch) p.catch(function () { v.controls = savedControls.controls; savedControls = null; }); } catch (err) {}
+  }, true);
+
+  document.addEventListener("fullscreenchange", function () {
+    if (!document.fullscreenElement && savedControls) { savedControls.video.controls = savedControls.controls; savedControls = null; }
+  });
 
   addEventListener("scroll", function () { if (focused && ring && ring.style.display !== "none") window.tvnav.refresh(); }, { passive: true });
   addEventListener("resize", function () { window.tvnav.refresh(); });

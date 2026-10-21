@@ -886,7 +886,16 @@ public class MainActivity extends Activity {
                 String[] p = report.split("\\|", 5);
                 videoPlaying = "1".equals(p[0]); videoPos = Integer.parseInt(p[1]); videoDur = Integer.parseInt(p[2]); videoRate = Float.parseFloat(p[3]);
                 hudTitle.setText(p.length > 4 ? p[4] : ""); updateHud();
-                if (videoPlaying && !videoActive) { videoActive = true; showHud(); }
+                if (videoPlaying && !videoActive) {
+                    videoActive = true; showHud();
+                    if (fullscreenView == null && web != null) web.evaluateJavascript("window.tvnav ? tvnav.wantFullscreen() : 'no'", r -> {
+                        // a real key event carries the user gesture the page needs for requestFullscreen
+                        if ("\"yes\"".equals(r) && web != null) {
+                            web.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_F12));
+                            web.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_F12));
+                        }
+                    });
+                }
             });
         }
     }
