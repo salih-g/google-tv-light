@@ -89,7 +89,6 @@ public class MainActivity extends Activity {
     private View lastDockFocus;
     private PopupWindow inputsPopup;
     private boolean receiverRegistered;
-    private ObjectAnimator kenBurns;
     private SharedPreferences prefs;
     private View prevFocus;
     private int lastDir = View.FOCUS_RIGHT;
@@ -118,7 +117,6 @@ public class MainActivity extends Activity {
     @Override protected void onResume() {
         super.onResume();
         wallpapers.start();
-        startKenBurns();
         handler.post(minuteTick);
         if (!receiverRegistered) {
             IntentFilter f = new IntentFilter();
@@ -133,7 +131,6 @@ public class MainActivity extends Activity {
     @Override protected void onPause() {
         super.onPause();
         wallpapers.stop();
-        if (kenBurns != null) kenBurns.pause();
         handler.removeCallbacks(minuteTick);
         if (receiverRegistered) { unregisterReceiver(packageReceiver); receiverRegistered = false; }
         if (inputsPopup != null && inputsPopup.isShowing()) inputsPopup.dismiss();
@@ -169,15 +166,6 @@ public class MainActivity extends Activity {
     };
 
     /** Very slow zoom on the wallpaper layer (both frames), the way Apple TV screensavers breathe. */
-    private void startKenBurns() {
-        if (kenBurns == null) {
-            kenBurns = ObjectAnimator.ofFloat(wallLayer, View.SCALE_X, 1f, 1.06f);
-            kenBurns.setDuration(45_000); kenBurns.setRepeatCount(ValueAnimator.INFINITE); kenBurns.setRepeatMode(ValueAnimator.REVERSE);
-            kenBurns.setInterpolator(new AccelerateDecelerateInterpolator());
-            kenBurns.addUpdateListener(a -> wallLayer.setScaleY((Float) a.getAnimatedValue()));
-            kenBurns.start();
-        } else if (kenBurns.isPaused()) kenBurns.resume();
-    }
 
     // ---------- keys ----------
 
