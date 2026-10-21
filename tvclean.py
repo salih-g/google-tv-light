@@ -6,6 +6,7 @@ Safety model
   which stops them running and is undone with `pm enable`.
 - `uninstall` only works on Play Store apps (installer = com.android.vending) and never on KEEP_APPS.
 - Packages in protected.py are refused by every mutating command, even if a plan file lists them.
+- So is any package that created a saved Wi-Fi network: Android erases its networks when it is disabled.
 - Every mutating command first writes a snapshot of all package states to snapshots/, and
   `restore <snapshot>` brings the TV back to exactly that state.
 - Mutating commands are dry-run unless --yes is given.
@@ -144,6 +145,16 @@ def mem_summary(dev) -> dict:
     }
 
 
+def wifi_creators(dev) -> set:
+    """Packages that created a saved Wi-Fi network. Android deletes an app's saved networks when that app
+    is removed or disabled, so these are never put to sleep (networks made in Settings belong to the system uid)."""
+    out = dev.shell("dumpsys wifi", read_timeout_s=120) or ""
+    return {n for n in re.findall(r"\bcname=([\w.]+)(?=\s)", out) if "." in n}
+
+
+WIFI_REFUSAL = "created a saved Wi-Fi network (Android would erase it): forget it and add it again in Settings first"
+
+
 def cmd_mem(dev):
     m = mem_summary(dev)
     print(f"RAM total {m['total_mb']} MB, available {m['available_mb']} MB, swap used {m['swap_used_mb']} MB")
@@ -181,11 +192,13 @@ def apply(dev, actions: list):
 
 def cmd_sleep(dev, args):
     plan, wanted = args[0], read_plan(args[0])
-    states = package_states(dev)
+    states, wifi = package_states(dev), wifi_creators(dev)
     actions, skipped = [], []
     for p in wanted:
         if is_protected(p):
             skipped.append((p, "PROTECTED, refused"))
+        elif p in wifi:
+            skipped.append((p, WIFI_REFUSAL))
         elif p not in states:
             skipped.append((p, "not installed"))
         elif not states[p]["enabled"]:
@@ -212,11 +225,13 @@ def cmd_wake(dev, args):
 def cmd_hide(dev, args):
     """`pm hide`: stronger than disable; survives the firmware re-enabling PERSISTENT packages at boot."""
     plan, wanted = args[0], read_plan(args[0])
-    states = package_states(dev)
+    states, wifi = package_states(dev), wifi_creators(dev)
     actions, skipped = [], []
     for p in wanted:
         if is_protected(p):
             skipped.append((p, "PROTECTED, refused"))
+        elif p in wifi:
+            skipped.append((p, WIFI_REFUSAL))
         elif p not in states:
             skipped.append((p, "not installed"))
         elif states[p]["hidden"]:
@@ -244,11 +259,13 @@ def cmd_remove(dev, args):
     `readd` (pm install-existing) brings it back. Needed for PERSISTENT packages, which the system
     starts at boot even while disabled."""
     plan, wanted = args[0], read_plan(args[0])
-    states = package_states(dev)
+    states, wifi = package_states(dev), wifi_creators(dev)
     actions, skipped = [], []
     for p in wanted:
         if is_protected(p):
             skipped.append((p, "PROTECTED, refused"))
+        elif p in wifi:
+            skipped.append((p, WIFI_REFUSAL))
         elif p not in states:
             skipped.append((p, "not installed for user 0"))
         elif not states[p]["system"]:
@@ -324,12 +341,14 @@ def cmd_reboot(dev, args):
 
 def cmd_uninstall(dev, args):
     plan, wanted = args[0], read_plan(args[0])
-    states = package_states(dev)
+    states, wifi = package_states(dev), wifi_creators(dev)
     actions, skipped = [], []
     for p in wanted:
         s = states.get(p)
         if p in KEEP_APPS or is_protected(p):
             skipped.append((p, "PROTECTED, refused"))
+        elif p in wifi:
+            skipped.append((p, WIFI_REFUSAL))
         elif s is None:
             skipped.append((p, "not installed"))
         elif s["system"] or s["installer"] != "com.android.vending":
