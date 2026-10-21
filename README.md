@@ -135,6 +135,33 @@ it the system refuses to bind the service:
 
 Off: `tvclean.py shell 'settings put secure enabled_accessibility_services "" && settings put secure accessibility_enabled 0'`.
 
+**Home settings on the TV.** *Home settings* sits in the all-apps grid (or long-press the Settings
+pill). It switches the Home screen (this one or Google TV's) and the screensaver (this one or
+Google's), picks what each remote app button opens, sets the weather city and unit, and how often
+the wallpaper changes. The Home and screensaver switches run fixed commands through the TV's own
+ADB from inside the TV (`Adb.java`, adapted from Free My TV): the first time, the TV asks *Allow USB
+debugging?*; tick *Always allow*.
+
+**Weather and real sunsets.** The pill next to Wi-Fi shows the temperature from
+[Open-Meteo](https://open-meteo.com/) (free, no key), and the wallpaper's morning, day, evening
+and night follow that city's real sunrise and sunset instead of fixed hours. The city comes from
+the TV's time zone; a zone like `GMT+03:00` names no city, so the pill says *Set city* until one is
+picked in Home settings.
+
+**Screensaver.** The wallpapers full screen with a large clock, the date and the weather. It draws
+a frame only for a scene change every five minutes and the minute tick, then sits idle; Google's
+ambient screensaver animated constantly, stuttered, and holds about 250 MB while it runs (it is put
+to sleep when this one is chosen).
+
+**Safety net.** If Home crashes three times within five minutes, a job in a separate process gives
+Home and the screensaver back to Google (tested by crashing it on purpose with `am crash`). Switch
+back in Home settings.
+
+**Frame rate.** Measured with `dumpsys gfxinfo` on this TV: the panel runs at 50 Hz and its
+hardware composer can't show an app layer directly, so every frame of every app is composited on
+the GPU. A continuously zooming wallpaper kept Home redrawing at ~30 fps with 99.6% janky frames.
+Home now draws nothing while idle (0 frames in 5 s) and navigation runs at a 9 ms median frame.
+
 ### 3. Optional: block the telemetry at the router
 
 If you run AdGuard Home or Pi-hole, [`adguard/tcl-google-tv-rules.txt`](adguard/tcl-google-tv-rules.txt)
@@ -167,4 +194,6 @@ USB debugging. Not for Samsung (Tizen), LG (webOS) or Fire TV.
 
 Code is MIT ([LICENSE](LICENSE)). Wallpapers and icons have their own licenses, see
 [`launcher/wallpapers/CREDITS.md`](launcher/wallpapers/CREDITS.md). Inspired by
-[mihirgupta0900/tv-home](https://github.com/mihirgupta0900/tv-home).
+[mihirgupta0900/tv-home](https://github.com/mihirgupta0900/tv-home). The in-TV ADB client and the crash
+watchdog idea come from [Free My TV](https://github.com/simbasjungles/free-my-tv) (MIT). Weather data by
+[Open-Meteo.com](https://open-meteo.com/) (CC BY 4.0). Weather icons: [Material Symbols](https://fonts.google.com/icons) (Apache 2.0).

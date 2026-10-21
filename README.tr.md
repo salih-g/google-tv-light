@@ -134,6 +134,35 @@ anahtarı), o olmadan sistem servisi bağlamayı reddeder:
 
 Kapatmak: `tvclean.py shell 'settings put secure enabled_accessibility_services "" && settings put secure accessibility_enabled 0'`.
 
+**TV'de ana ekran ayarları.** *Ana ekran ayarları* tüm uygulamalar ızgarasında (ya da Ayarlar
+hapına uzun bas). Ana ekranı (bu ya da Google TV) ve ekran koruyucuyu (bu ya da Google'ınki)
+değiştirir, kumandanın her uygulama tuşunun neyi açacağını, hava durumu şehrini ve birimini,
+duvar kağıdının ne sıklıkla değişeceğini seçer. Ana ekran ve ekran koruyucu geçişleri, TV'nin kendi
+ADB'si üzerinden TV'nin içinden sabit komutlar çalıştırır (`Adb.java`, Free My TV'den uyarlandı):
+ilk seferde TV *USB hata ayıklamaya izin verilsin mi?* diye sorar; *Her zaman izin ver*i işaretle.
+
+**Hava durumu ve gerçek gün batımı.** Wi-Fi'ın yanındaki hap sıcaklığı
+[Open-Meteo](https://open-meteo.com/)'dan gösterir (ücretsiz, anahtarsız); duvar kağıdının sabah,
+gündüz, akşam ve gecesi sabit saatler yerine o şehrin gerçek gün doğumu ve batımını izler. Şehir
+TV'nin saat diliminden gelir; `GMT+03:00` gibi bir dilim şehir adı içermez, bu yüzden hap Ana ekran
+ayarlarında bir şehir seçilene kadar *Şehir seç* der.
+
+**Ekran koruyucu.** Duvar kağıtları tam ekran, büyük saat, tarih ve hava durumu. Sadece beş
+dakikada bir sahne geçişi ve dakika güncellemesi için kare çizer, gerisinde boşta durur; Google'ın
+ambient ekran koruyucusu sürekli animasyon yapıyor, takılıyor ve çalışırken yaklaşık 250 MB
+tutuyordu (bu seçilince uyutulur).
+
+**Güvenlik ağı.** Ana ekran beş dakika içinde üç kez çökerse, ayrı bir süreçteki iş ana ekranı ve
+ekran koruyucuyu Google'a geri verir (`am crash` ile kasıtlı çökertilerek test edildi). Ana ekran
+ayarlarından geri dönülür.
+
+**Kare hızı.** Bu TV'de `dumpsys gfxinfo` ile ölçüldü: panel 50 Hz'de çalışıyor ve donanım
+birleştiricisi bir uygulama katmanını doğrudan gösteremiyor, yani her uygulamanın her karesi GPU'da
+birleştiriliyor. Sürekli yakınlaşan duvar kağıdı ana ekranı ~30 fps'te, %99,6 takılan kareyle
+yeniden çizdiriyordu. Ana ekran artık boştayken hiç çizmiyor (5 saniyede 0 kare), gezinmede ortanca
+kare 9 ms.
+
+
 ### 3. İsteğe bağlı: telemetriyi modemde kes
 
 AdGuard Home ya da Pi-hole kullanıyorsan [`adguard/tcl-google-tv-rules.txt`](adguard/tcl-google-tv-rules.txt)
@@ -166,4 +195,6 @@ Google TV'de çalışır. Samsung (Tizen), LG (webOS) ve Fire TV için değildir
 
 Kod MIT ([LICENSE](LICENSE)). Duvar kağıtları ve ikonların kendi lisansları
 [`launcher/wallpapers/CREDITS.md`](launcher/wallpapers/CREDITS.md) dosyasındadır.
-[mihirgupta0900/tv-home](https://github.com/mihirgupta0900/tv-home) projesinden ilham alınmıştır.
+[mihirgupta0900/tv-home](https://github.com/mihirgupta0900/tv-home) projesinden ilham alınmıştır. TV içi ADB
+istemcisi ve çökme koruması fikri [Free My TV](https://github.com/simbasjungles/free-my-tv)'den (MIT). Hava
+verisi [Open-Meteo.com](https://open-meteo.com/) (CC BY 4.0). Hava ikonları: [Material Symbols](https://fonts.google.com/icons) (Apache 2.0).
