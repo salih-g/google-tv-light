@@ -5,7 +5,9 @@
 __pycache__/
 .DS_Store
 
-# Launcher build output and signing key
+# Build output and signing keys
 launcher/build/
 launcher/debug.keystore
+browser/build/
+browser/debug.keystore
 snapshots/
