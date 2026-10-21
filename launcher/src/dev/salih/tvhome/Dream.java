@@ -42,6 +42,7 @@ public final class Dream extends DreamService {
     private final Runnable minute = new Runnable() {
         @Override public void run() {
             update(true);
+            Sky.refresh(Dream.this, false, () -> { update(false); wallpapers.weatherChanged(); });
             handler.postDelayed(this, 60_000 - System.currentTimeMillis() % 60_000);
         }
     };
@@ -86,6 +87,7 @@ public final class Dream extends DreamService {
         int w = getResources().getDisplayMetrics().widthPixels, h = getResources().getDisplayMetrics().heightPixels;
         Wallpapers.sun = t -> Sky.slot(this, t);
         wallpapers = new Wallpapers(this, back, front, handler, SCENE_MINUTES, w, h);
+        wallpapers.setWeather(() -> Sky.weatherName(this));   // rainy, snowy, foggy or cloudy frames when they ship
     }
 
     private TextView text(int sp, boolean bold) {
@@ -105,7 +107,7 @@ public final class Dream extends DreamService {
     @Override public void onDreamingStarted() {
         super.onDreamingStarted();
         wallpapers.start();
-        Sky.refresh(this, false, () -> update(false));
+        Sky.refresh(this, false, () -> { update(false); wallpapers.weatherChanged(); });
         update(false);
         handler.postDelayed(minute, 60_000 - System.currentTimeMillis() % 60_000);
     }

@@ -90,6 +90,18 @@ final class Sky {
         return "gece";
     }
 
+    /** Weather name used by wallpaper variants ("" for clear or partly cloudy skies, or when unknown). */
+    static String weatherName(Context c) {
+        if (temperature(c) == null) return "";
+        int code = code(c);
+        if (code <= 2) return "";
+        if (code == 3) return "bulut";
+        if (code == 45 || code == 48) return "sis";
+        if ((code >= 71 && code <= 77) || code == 85 || code == 86) return "kar";
+        if (code >= 95) return "firtina";
+        return "yagmur";
+    }
+
     static int icon(int code, boolean day) {
         if (code == 0) return day ? R.drawable.ic_w_clear_day : R.drawable.ic_w_clear_night;
         if (code <= 2) return day ? R.drawable.ic_w_partly_cloudy_day : R.drawable.ic_w_partly_cloudy_night;

@@ -36,7 +36,12 @@ final class Wallpapers {
     private final int width, height;
     private final Map<String, List<String>> scenes = new HashMap<>(); // scene -> slots available
     private final List<String> sceneOrder = new ArrayList<>();
-    private String currentScene, currentSlot;
+    private String currentScene, currentSlot, currentWeather = "";
+    // Weather variants: "<scene>-<slot>-<weather>" frames that exist (weather = yagmur, kar, sis, bulut, firtina).
+    private static final List<String> WEATHERS = java.util.Arrays.asList("yagmur", "kar", "sis", "bulut", "firtina");
+    private final java.util.Set<String> variants = new java.util.HashSet<>();
+    /** Current weather name for variant frames, or null/"" for plain frames. Only the screensaver sets it. */
+    private java.util.function.Supplier<String> weather;
 
     Wallpapers(Context ctx, ImageView back, ImageView front, Handler handler, int minutes, int w, int h) {
         this.ctx = ctx; this.back = back; this.front = front; this.handler = handler;
@@ -49,6 +54,7 @@ final class Wallpapers {
             for (String f : ctx.getAssets().list("wallpapers")) {
                 if (!f.endsWith(".jpg")) continue;
                 String[] parts = f.substring(0, f.length() - 4).split("-");
+                if (parts.length == 3 && slotIndex(parts[1]) >= 0 && WEATHERS.contains(parts[2])) { variants.add(parts[0] + "-" + parts[1] + "-" + parts[2]); continue; }
                 if (parts.length != 2 || slotIndex(parts[1]) < 0) continue; // ignore extras like "-pastel"
                 if (!scenes.containsKey(parts[0])) { scenes.put(parts[0], new ArrayList<>()); sceneOrder.add(parts[0]); }
                 scenes.get(parts[0]).add(parts[1]);
@@ -110,8 +116,47 @@ final class Wallpapers {
         if (currentScene != null && !slot.equals(wantedSlot)) { handler.removeCallbacks(tick); handler.post(tick); }
     }
 
+    /** Picks frames that match the weather (rain, snow, fog, clouds) when such variants ship; plain frames otherwise. */
+    void setWeather(java.util.function.Supplier<String> weather) { this.weather = weather; }
+
+    /** The weather changed: show the current scene's matching frame now (or the plain one again), with a crossfade. */
+    void weatherChanged() {
+        if (currentScene == null) return;
+        String w = wantedWeather();
+        if (w.equals(currentWeather)) return;
+        String slot = wantedSlot != null ? wantedSlot : currentSlot;
+        String scene = w.isEmpty() || hasVariant(currentScene, slot, w) ? currentScene : nextScene(slot);
+        currentSlot = null;   // force the redraw even when the scene stays
+        show(scene, slot, true);
+    }
+
+    private String wantedWeather() {
+        java.util.function.Supplier<String> s = weather;
+        String w = s == null ? null : s.get();
+        return w == null ? "" : w;
+    }
+
+    /** The variant to use for this weather: itself, else a close one (storm → rain, fog → clouds); null if none. */
+    private String variantFor(String scene, String slot, String w) {
+        if (w.isEmpty()) return null;
+        for (String c : new String[]{w, w.equals("firtina") ? "yagmur" : w.equals("sis") ? "bulut" : null})
+            if (c != null && variants.contains(scene + "-" + slot + "-" + c)) return c;
+        return null;
+    }
+
+    private boolean hasVariant(String scene, String slot, String w) { return variantFor(scene, slot, w) != null; }
+
     private String nextScene(String slot) {
         if (sceneOrder.isEmpty()) return null;
+        String w = wantedWeather();
+        if (!w.isEmpty()) {   // when it rains, a scene that has a rainy frame for this time of day comes first
+            int from = currentScene == null ? 0 : sceneOrder.indexOf(currentScene) + 1;
+            for (int i = 0; i < sceneOrder.size(); i++) {
+                String s = sceneOrder.get((from + i) % sceneOrder.size());
+                if (hasVariant(s, slot, w) && (!s.equals(currentScene) || sceneOrder.size() == 1)) return s;
+            }
+            if (currentScene != null && hasVariant(currentScene, slot, w)) return currentScene;
+        }
         int start = currentScene == null ? (int) (System.currentTimeMillis() / intervalMs % sceneOrder.size())
                                          : sceneOrder.indexOf(currentScene) + 1;
         for (int i = 0; i < sceneOrder.size(); i++) {
@@ -124,8 +169,12 @@ final class Wallpapers {
     private void show(String scene, String slot, boolean animate) {
         if (scene == null) return;
         String frame = scenes.get(scene).contains(slot) ? slot : fallbackSlot(scene, slot);
-        if (scene.equals(currentScene) && frame.equals(currentSlot)) return;
-        Bitmap bmp = decode("wallpapers/" + scene + "-" + frame + ".jpg");
+        String w = wantedWeather();
+        String v = variantFor(scene, frame, w);
+        String file = v != null ? scene + "-" + frame + "-" + v : scene + "-" + frame;
+        String shownWeather = v != null ? w : "";
+        if (scene.equals(currentScene) && frame.equals(currentSlot) && shownWeather.equals(currentWeather)) return;
+        Bitmap bmp = decode("wallpapers/" + file + ".jpg");
         if (bmp == null) return;
         BitmapDrawable d = new BitmapDrawable(ctx.getResources(), bmp);
         // z-order never changes: `back` sits at the bottom, `front` right above it, the UI above both.
@@ -146,7 +195,7 @@ final class Wallpapers {
             back.setImageDrawable(d); back.setAlpha(1f); back.setVisibility(View.VISIBLE);
             front.setImageDrawable(null); front.setVisibility(View.INVISIBLE);
         }
-        currentScene = scene; currentSlot = frame; changedAt = System.currentTimeMillis();
+        currentScene = scene; currentSlot = frame; currentWeather = shownWeather; changedAt = System.currentTimeMillis();
     }
 
     /** A scene missing the exact slot shows its nearest earlier frame; night falls back to evening, then day. */
