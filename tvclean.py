@@ -29,10 +29,12 @@ Usage
   tvclean.py home check | home set <pkg/.Activity> [--yes] | home reset [--yes]
   tvclean.py check [--fix] [--yes]       after a firmware update: compare the TV with plans/ (and Home, the remote
                                          key service); --fix --yes re-applies what drifted. Exit 0 ok, 1 drift, 2 no TV
+  tvclean.py screenshot <out.png>        save what the TV shows (read-only)
   tvclean.py shell '<cmd>'               one read-only shell command
 
 TV address: TV_HOST env or .tv_host file next to this script.
 """
+import base64
 import datetime as dt
 import json
 import os
@@ -306,7 +308,25 @@ def cmd_install(dev, args):
     if confirm_or_dry(args, f"install {os.path.basename(apk)}", actions):
         write_snapshot(dev, "before-install")
         push_b64(dev, apk, remote)
+        home_in_front = home_package(dev) in resumed_package(dev)
         apply(dev, actions)
+        if home_in_front:
+            # Reinstalling the Home app kills it, and Android then shows the task under it (often
+            # YouTube) instead of Home. Put Home back if it was on screen; an app in front stays.
+            sh(dev, "am start -a android.intent.action.MAIN -c android.intent.category.HOME")
+            print("Home was on screen: brought it back")
+
+
+def home_package(dev) -> str:
+    home = sh(dev, "cmd package resolve-activity -a android.intent.action.MAIN -c android.intent.category.HOME --brief")
+    lines = home.strip().splitlines()
+    return lines[-1].split("/")[0] if lines and "/" in lines[-1] else "?"
+
+
+def resumed_package(dev) -> str:
+    """Package of the activity on screen, '' if unknown."""
+    m = re.search(r"mResumedActivity: ActivityRecord\{\S+ u\d+ ([\w.]+)/", sh(dev, "dumpsys activity activities | grep mResumedActivity"))
+    return m.group(1) if m else ""
 
 
 def push_b64(dev, local: str, remote: str, chunk: int = 48_000):
@@ -473,6 +493,20 @@ def cmd_check(dev, args):
 
 # ---------- read-only commands ----------
 
+def cmd_screenshot(dev, args):
+    """screencap on the TV, read back in base64 chunks (adb-shell's sync pull times out on this TV)."""
+    out = args[0] if args else "tv.png"
+    remote = "/data/local/tmp/tvclean-shot.png"
+    sh(dev, f"screencap -p {remote}")
+    size, chunk, data = int(sh(dev, f"stat -c %s {remote}")), 512 * 1024, b""
+    for i in range((size + chunk - 1) // chunk):
+        data += base64.b64decode(sh(dev, f"dd if={remote} bs={chunk} skip={i} count=1 2>/dev/null | base64 -w 0"))
+    sh(dev, f"rm -f {remote}")
+    with open(out, "wb") as f:
+        f.write(data)
+    print(f"{out}: {len(data) // 1024} KB")
+
+
 def cmd_find(_dev, args):
     """Scan the local /24 for TVs with ADB (5555) open. Runs without a TV address."""
     import socket, subprocess, concurrent.futures
@@ -529,6 +563,7 @@ COMMANDS = {
     "restore": cmd_restore,
     "home": cmd_home,
     "check": cmd_check,
+    "screenshot": cmd_screenshot,
     "shell": lambda d, a: print(sh(d, " ".join(a))),
 }
 
