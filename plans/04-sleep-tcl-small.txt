@@ -3,5 +3,4 @@ com.tcl.ocean.instructions       # on-TV manual
 com.tcl.assistant                # TCL assistant shim
 com.tcl.logkit                   # log collection
 com.tcl.t_solo                   # T-Solo
-com.tcl.initsetup                # first-run setup (already done)
 com.tcl.useragreement            # EULA / consent prompts

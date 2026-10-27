@@ -23,6 +23,7 @@ PROTECTED = {
     "com.tcl.micmanager",
     "com.google.android.tv.remote.service",
     "com.tcl.keyhelp",                      # TV panel buttons (TclPhoneWindowManager.handlePanelButton)
+    "com.tcl.initsetup",                    # channel scanning; TCL's system service checks it at boot
     # --- casting / mirroring (owner uses them) ---
     "com.google.android.apps.mediashell",   # Chromecast built-in
     "com.tcl.miracast",                     # screen mirroring

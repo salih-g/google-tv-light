@@ -1,0 +1,5 @@
+# Undo for one more package of batch 3. TCL's first-run setup also owns antenna/cable channel scanning (other
+# TCL Google TV sets: re-enable it before rescanning channels), and TCL's system service looks at its screens at
+# boot. On one TCL model, disabling it together with providers.config and factory.view dropped Wi-Fi outright
+# (cleanyourtv #23). No boot receiver, so it costs nothing while idle. Apply with `wake`. Also in protected.py.
+com.tcl.initsetup                # first-run setup + channel installation

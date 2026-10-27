@@ -20,13 +20,14 @@ list. How this one was built:
 | `01-uninstall-playstore.txt` | Play Store apps the owner no longer used (`uninstall`) |
 | `02-sleep-tcl-resident.txt` | TCL services resident in RAM: account, app showcase, home tab, analytics, popups |
 | `03-sleep-tcl-promo.txt` | promo stickers, partner rows, TCL Channel, dashboard, browser, companions |
-| `04-sleep-tcl-small.txt` | manual, assistant shim, log kit, first-run setup, EULA prompts |
+| `04-sleep-tcl-small.txt` | manual, assistant shim, log kit, EULA prompts |
 | `05-sleep-google-extras.txt` | silent app installer, Play Games, YouTube Music, partner tracking, calendar, SMS, camera, print |
 | `06a-sleep-waterfall.txt` | TCL content feed (bootloop reports on other models: alone) |
 | `06b-sleep-guard.txt` | Safety Guard via `sleep` — did not stick, it is PERSISTENT; see `07` |
 | `07-remove-guard.txt` | Safety Guard via `remove` (uninstall for user 0, APK stays) |
 | `08-sleep-stock-home.txt` | Google TV home + setup wizard, needed for a third-party Home key |
 | `09-wake-panel-buttons.txt` | `wake`: key help back, it drives the TV's own panel buttons (it was in `04`) |
+| `10-wake-initsetup.txt` | `wake`: first-run setup back, it also owns channel scanning (it was in `04`) |
 
 Known-bad on some TCL models (keep in `protected.py` unless you have tested): `com.android.location.fused`
 (bootloop reports), `com.tcl.waterfall.overseas` (bootloop reports when *uninstalled*; sleeping it was fine here).
