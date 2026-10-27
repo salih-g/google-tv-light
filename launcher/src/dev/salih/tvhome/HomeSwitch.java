@@ -67,11 +67,11 @@ final class HomeSwitch {
      * Puts the remote's app-button service (KeyService) back when something turned it off: Settings, an accessibility
      * reset after a firmware update, TCL's Safety Guard. Called each time Home shows; nothing to do while it is on.
      * Uses the WRITE_SECURE_SETTINGS grant useOurHome makes; a TV switched before that grant existed gets it here over
-     * the TV's ADB (2 s for a prompt; a key not allowed yet leaves the service off, as before).
+     * the TV's ADB, only once the TV trusts this app (Adb.trusted), so no prompt pops up over Home.
      * Blocking when it has work: call off the main thread.
      */
     static void repairKeys(Context c) {
-        if (!ourHome(c) || keysOn(c)) return;
+        if (!ourHome(c) || keysOn(c) || !Adb.trusted(c)) return;
         try {
             if (c.checkSelfPermission(WRITE_SECURE_SETTINGS) != PackageManager.PERMISSION_GRANTED) {
                 try (Adb adb = Adb.connect(c, 2000, null)) { adb.shell("pm grant dev.salih.tvhome " + WRITE_SECURE_SETTINGS); }

@@ -47,6 +47,7 @@ final class Cec {
     /** Re-reads the device list in the background, then runs `done` on the main thread if anything changed. */
     static void refresh(Context context, Runnable done) {
         Context c = context.getApplicationContext();
+        if (!Adb.trusted(c)) return;   // never raise the debugging prompt from a menu
         IO.execute(() -> {
             Map<String, Device> found = new HashMap<>();
             try (Adb adb = Adb.connect(c, 2000, null)) {

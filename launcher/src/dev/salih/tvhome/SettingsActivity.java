@@ -91,6 +91,17 @@ public final class SettingsActivity extends Activity {
             prefs.edit().putInt("wallpaper_minutes", next).apply(); build();
         });
 
+        section(R.string.section_adguard);
+        String agUrl = prefs.getString(Guard.URL, ""), agUser = prefs.getString(Guard.USER, "");
+        row(getString(R.string.ag_address), agUrl.isEmpty() ? getString(R.string.ag_not_set) : agUrl.replaceFirst("^https?://", ""), () ->
+                askText(R.string.ag_address, "192.168.1.1:3000", false, v -> { prefs.edit().putString(Guard.URL, Guard.normalize(v)).apply(); build(); testGuard(); }));
+        if (!agUrl.isEmpty()) {
+            row(getString(R.string.ag_user), agUser.isEmpty() ? "—" : agUser, () ->
+                    askText(R.string.ag_user, "admin", false, v -> { prefs.edit().putString(Guard.USER, v.trim()).apply(); build(); testGuard(); }));
+            row(getString(R.string.ag_password), prefs.getString(Guard.PASS, "").isEmpty() ? "—" : "••••••", () ->
+                    askText(R.string.ag_password, "", true, v -> { prefs.edit().putString(Guard.PASS, v).apply(); build(); testGuard(); }));
+        }
+
         View first = keep >= 0 && keep < list.getChildCount() ? list.getChildAt(keep) : null;
         if (first == null || !first.isFocusable()) for (int i = 0; i < list.getChildCount(); i++) if (list.getChildAt(i).isFocusable()) { first = list.getChildAt(i); break; }
         if (first != null) first.requestFocus();
@@ -203,6 +214,29 @@ public final class SettingsActivity extends Activity {
         d.setOnShowListener(x -> d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> go.run()));
         input.setOnEditorActionListener((v, action, ev) -> { go.run(); return true; });
         d.show();
+    }
+
+    private interface Text { void entered(String value); }
+
+    /** One-line text dialog; an empty field (the TV keyboard drops selections), OK or the keyboard's Done saves. */
+    private void askText(int title, String hint, boolean password, Text done) {
+        EditText input = new EditText(this);
+        input.setSingleLine(true); input.setHint(hint);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | (password ? InputType.TYPE_TEXT_VARIATION_PASSWORD : InputType.TYPE_TEXT_VARIATION_URI));
+        input.setImeOptions(EditorInfo.IME_ACTION_DONE);
+        AlertDialog d = new AlertDialog.Builder(this).setTitle(title).setView(input)
+                .setPositiveButton(android.R.string.ok, null).setNegativeButton(android.R.string.cancel, null).create();
+        Runnable go = () -> { d.dismiss(); done.entered(input.getText().toString()); };
+        d.setOnShowListener(x -> d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> go.run()));
+        input.setOnEditorActionListener((v, action, ev) -> { go.run(); return true; });
+        d.show();
+    }
+
+    /** Tries AdGuard Home with what is saved and says how it went. */
+    private void testGuard() {
+        if (!Guard.configured(this) || prefs.getString(Guard.PASS, "").isEmpty()) return;
+        Guard.status(this, (s, err) -> toast(err != null ? getString(R.string.ag_failed, err)
+                : getString(R.string.ag_ok, s.blocked, s.queries)));
     }
 
     private void searchCity(String query) {

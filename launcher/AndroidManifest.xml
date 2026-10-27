@@ -37,7 +37,9 @@
         </intent>
     </queries>
 
+    <!-- cleartext: AdGuard Home and other LAN dashboards serve plain HTTP at an address typed in Home settings -->
     <application
+        android:usesCleartextTraffic="true"
         android:label="Home"
         android:icon="@drawable/ic_home"
         android:banner="@drawable/ic_home"

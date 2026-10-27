@@ -77,6 +77,16 @@ final class Adb implements Closeable {
         out = socket.getOutputStream();
     }
 
+    /**
+     * True once the TV has let this app in (or granted it what only ADB can, which needs the same): background uses
+     * (Cec, HomeSwitch.repairKeys) connect only then, so the "Allow USB debugging?" prompt never pops up on its own;
+     * it shows only after something done in Home settings.
+     */
+    static boolean trusted(Context c) {
+        return c.getSharedPreferences(Sky.PREFS, Context.MODE_PRIVATE).getBoolean("adb_trusted", false)
+                || c.checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") == android.content.pm.PackageManager.PERMISSION_GRANTED;
+    }
+
     /** Connects and authenticates. If the TV doesn't know our key yet, waits up to `approvalMs` for you to accept. */
     static Adb connect(Context c, int approvalMs, Approval approval) throws IOException {
         KeyPair keys = keys(c);
@@ -107,6 +117,7 @@ final class Adb implements Closeable {
                 }
                 if (m.command == CNXN) {
                     s.setSoTimeout(20_000);
+                    c.getSharedPreferences(Sky.PREFS, Context.MODE_PRIVATE).edit().putBoolean("adb_trusted", true).apply();
                     return adb;
                 }
                 if (m.command == STLS) throw new IOException("the TV asked for TLS (wireless debugging); use USB debugging");

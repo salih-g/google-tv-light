@@ -160,21 +160,61 @@ final class Sky {
 
     private static void fetch(Context c) throws IOException, JSONException {
         SharedPreferences p = prefs(c);
+        float lat = p.getFloat("city_lat", 0), lon = p.getFloat("city_lon", 0);
         String url = String.format(Locale.US,
-                "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f&current=temperature_2m,weather_code,is_day"
-                        + "&daily=sunrise,sunset&timezone=auto&timeformat=unixtime&forecast_days=2%s",
-                p.getFloat("city_lat", 0), p.getFloat("city_lon", 0), fahrenheit(c) ? "&temperature_unit=fahrenheit" : "");
+                "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
+                        + "&current=temperature_2m,weather_code,is_day,apparent_temperature,relative_humidity_2m,wind_speed_10m"
+                        + "&daily=sunrise,sunset,weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"
+                        + "&timezone=auto&timeformat=unixtime&forecast_days=4%s",
+                lat, lon, fahrenheit(c) ? "&temperature_unit=fahrenheit&wind_speed_unit=mph" : "");
         JSONObject o = new JSONObject(get(url));
         JSONObject cur = o.getJSONObject("current");
         JSONObject daily = o.getJSONObject("daily");
+        // The weather card's extras, kept as one JSON string: {feels, humidity, wind, days: [[time, code, max, min, rain%]...]}
+        JSONObject more = new JSONObject()
+                .put("feels", cur.optDouble("apparent_temperature")).put("humidity", cur.optInt("relative_humidity_2m"))
+                .put("wind", cur.optDouble("wind_speed_10m"));
+        JSONArray days = new JSONArray();
+        JSONArray time = daily.getJSONArray("time");
+        for (int i = 0; i < time.length(); i++) {
+            days.put(new JSONArray().put(time.getLong(i)).put(daily.getJSONArray("weather_code").optInt(i))
+                    .put(daily.getJSONArray("temperature_2m_max").optDouble(i)).put(daily.getJSONArray("temperature_2m_min").optDouble(i))
+                    .put(daily.getJSONArray("precipitation_probability_max").optInt(i, -1)));
+        }
+        more.put("days", days);
+        // Air quality is a separate Open-Meteo service; the card leaves the row out when it doesn't answer.
+        try {
+            JSONObject air = new JSONObject(get(String.format(Locale.US,
+                    "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=%.4f&longitude=%.4f&current=us_aqi", lat, lon)));
+            more.put("aqi", air.getJSONObject("current").getInt("us_aqi"));
+        } catch (IOException | JSONException e) {
+            android.util.Log.w("tvhome", "air quality failed: " + e);
+        }
         p.edit()
                 .putFloat("wx_temp", (float) cur.getDouble("temperature_2m"))
                 .putInt("wx_code", cur.getInt("weather_code"))
                 .putBoolean("wx_day", cur.optInt("is_day", 1) == 1)
                 .putString("sun_rise", join(daily.getJSONArray("sunrise")))
                 .putString("sun_set", join(daily.getJSONArray("sunset")))
+                .putString("wx_more", more.toString())
                 .putLong("wx_at", System.currentTimeMillis())
                 .apply();
+    }
+
+    /** The weather card's extras from the last fetch, or null before one. */
+    static JSONObject more(Context c) {
+        try { return new JSONObject(prefs(c).getString("wx_more", "")); } catch (JSONException e) { return null; }
+    }
+
+    /** US AQI band: label and colour (EPA bands, Apple-style colours). */
+    static int aqiLabel(int aqi) {
+        return aqi <= 50 ? R.string.aqi_good : aqi <= 100 ? R.string.aqi_moderate : aqi <= 150 ? R.string.aqi_sensitive
+                : aqi <= 200 ? R.string.aqi_unhealthy : aqi <= 300 ? R.string.aqi_very : R.string.aqi_hazardous;
+    }
+
+    static int aqiColor(int aqi) {
+        return aqi <= 50 ? 0xFF34C759 : aqi <= 100 ? 0xFFFFD60A : aqi <= 150 ? 0xFFFF9F0A
+                : aqi <= 200 ? 0xFFFF453A : aqi <= 300 ? 0xFFBF5AF2 : 0xFFA2845E;
     }
 
     /** City search for Home settings. Blocking: call off the main thread. */

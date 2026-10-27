@@ -12,6 +12,8 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.content.res.ColorStateList;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Outline;
 import android.graphics.Typeface;
@@ -68,6 +70,7 @@ public class MainActivity extends Activity {
 
     private static final class App {
         final String pkg, label; final ComponentName component; final Drawable banner;
+        int accent;   // the banner's most vivid colour, for the dock's glow; 0 until first needed
         App(String pkg, String label, ComponentName component, Drawable banner) {
             this.pkg = pkg; this.label = label; this.component = component; this.banner = banner;
         }
@@ -93,6 +96,7 @@ public class MainActivity extends Activity {
     private List<App> apps = new ArrayList<>();
     private View lastDockFocus;
     private PopupWindow inputsPopup;
+    private View guardPill;   // shown once AdGuard Home is set up in Home settings
     private boolean receiverRegistered;
     private SharedPreferences prefs;
     private View prevFocus;
@@ -142,6 +146,7 @@ public class MainActivity extends Activity {
         }
         updateWeather();
         Sky.refresh(this, false, this::updateWeather);
+        guardPill.setVisibility(Guard.configured(this) ? View.VISIBLE : View.GONE);
         loadApps(); // picks up installs that happened while another app was in front
         if (prefs.getBoolean(Usage.PREF, false)) {
             Context app = getApplicationContext();
@@ -158,7 +163,7 @@ public class MainActivity extends Activity {
         wallpapers.stop();
         handler.removeCallbacks(minuteTick);
         if (receiverRegistered) { unregisterReceiver(packageReceiver); receiverRegistered = false; }
-        if (inputsPopup != null && inputsPopup.isShowing()) inputsPopup.dismiss();
+        dismissCards();
     }
 
     @Override protected void onNewIntent(Intent intent) {
@@ -201,7 +206,7 @@ public class MainActivity extends Activity {
                 showInputs(null);
                 return true;
             case KeyEvent.KEYCODE_BACK:
-                if (inputsPopup != null && inputsPopup.isShowing()) { inputsPopup.dismiss(); return true; }
+                if (dismissCards()) return true;
                 if (gridPanel.getVisibility() == View.VISIBLE) { showDock(true); return true; }
                 return true; // Back on the home screen does nothing (never falls into the stock launcher)
             case KeyEvent.KEYCODE_DPAD_DOWN:
@@ -260,6 +265,11 @@ public class MainActivity extends Activity {
         View bottom = new View(this);
         bottom.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0x00000000, 0x80000000, 0xCC000000}));
         root.addView(bottom, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(280), Gravity.BOTTOM));
+        // Ambient glow: a soft light from below in the focused app's colour.
+        glowShape = new GradientDrawable(); glowShape.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+        glowShape.setGradientCenter(0.5f, 1f); glowShape.setGradientRadius(dp(340)); glowShape.setColors(new int[]{0, 0});
+        View glow = new View(this); glow.setBackground(glowShape);
+        root.addView(glow, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(340), Gravity.BOTTOM));
 
         // Top-left: clock, greeting + date
         LinearLayout topLeft = new LinearLayout(this); topLeft.setOrientation(LinearLayout.VERTICAL);
@@ -279,7 +289,10 @@ public class MainActivity extends Activity {
         settingsPill.setOnClickListener(v -> launch(new Intent(Settings.ACTION_SETTINGS)));
         settingsPill.setOnLongClickListener(v -> { launch(new Intent(this, SettingsActivity.class)); return true; });
         weatherPill = weatherPill();
-        for (View p : new View[]{weatherPill, inputsPill, wifiPill, settingsPill}) {
+        guardPill = pill(R.drawable.ic_shield, "AdGuard");
+        guardPill.setOnClickListener(this::showGuard);
+        guardPill.setVisibility(Guard.configured(this) ? View.VISIBLE : View.GONE);
+        for (View p : new View[]{weatherPill, guardPill, inputsPill, wifiPill, settingsPill}) {
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(34));
             lp.setMarginStart(dp(8)); pills.addView(p, lp);
         }
@@ -302,7 +315,15 @@ public class MainActivity extends Activity {
         dock = new LinearLayout(this); dock.setOrientation(LinearLayout.HORIZONTAL); dock.setGravity(Gravity.CENTER);
         dock.setClipChildren(false); dock.setClipToPadding(false);
         dock.setPadding(dp(48), dp(24), dp(48), dp(24));
-        dockScroll.addView(dock, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        // The dock sits on a frame with the glass slab behind it, so the slab scrolls with the tiles.
+        FrameLayout dockFrame = new FrameLayout(this); dockFrame.setClipChildren(false); dockFrame.setClipToPadding(false);
+        glass = new View(this);
+        GradientDrawable gd = new GradientDrawable(); gd.setCornerRadius(dp(14)); gd.setColor(0x26FFFFFF); gd.setStroke(Math.max(1, dp(1)), 0x4DFFFFFF);
+        glass.setBackground(gd); glass.setAlpha(0f);
+        dockFrame.addView(glass, new FrameLayout.LayoutParams(0, 0));
+        dockFrame.addView(dock, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));   // centred while it fits
+        dockScroll.addView(dockFrame, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        root.getViewTreeObserver().addOnGlobalFocusChangeListener((old, now) -> dockFocus(now));
         FrameLayout.LayoutParams dl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
         dl.setMargins(0, 0, 0, dp(40));
         root.addView(dockScroll, dl);
@@ -520,6 +541,71 @@ public class MainActivity extends Activity {
         focusedName.animate().cancel();
         focusedName.setAlpha(0f); focusedName.setTranslationY(dp(6)); focusedName.setText(name);
         focusedName.animate().alpha(1f).translationY(0f).setDuration(220).setInterpolator(new DecelerateInterpolator()).start();
+    }
+
+    // ---------- glass slab and glow ----------
+
+    private View glass;
+    private GradientDrawable glowShape;
+    private int glowColor;
+    private ValueAnimator glowAnim;
+
+    /** The glass slab slides to the focused dock tile and the glow takes its colour; both fade when focus leaves the dock. */
+    private void dockFocus(View now) {
+        boolean inDock = now != null && now.getParent() == dock && now.getTag() instanceof App;
+        if (!inDock) {
+            glass.animate().alpha(0f).setDuration(160).start();
+            setGlow(0);
+            return;
+        }
+        int pad = dp(6);
+        int w = Math.round(now.getWidth() * FOCUS_SCALE) + 2 * pad, h = Math.round(now.getHeight() * FOCUS_SCALE) + 2 * pad;
+        ViewGroup.LayoutParams lp = glass.getLayoutParams();
+        if (lp.width != w || lp.height != h) { lp.width = w; lp.height = h; glass.setLayoutParams(lp); }
+        float x = dock.getLeft() + now.getLeft() + now.getWidth() / 2f - w / 2f;
+        float y = dock.getTop() + now.getTop() + now.getHeight() / 2f - h / 2f;
+        if (glass.getAlpha() == 0f) { glass.setTranslationX(x); glass.setTranslationY(y); }   // appear in place, don't fly in
+        glass.animate().translationX(x).translationY(y).alpha(1f).setDuration(280).setInterpolator(SPRING).start();
+        int[] at = new int[2]; now.getLocationInWindow(at);
+        float cx = (at[0] + now.getWidth() / 2f) / Math.max(1, root.getWidth());
+        glowShape.setGradientCenter(Math.max(0.15f, Math.min(0.85f, cx)), 1f);   // the light comes from under the focused tile
+        setGlow(accent((App) now.getTag()));
+    }
+
+    private void setGlow(int color) {
+        if (color == glowColor) return;
+        if (glowAnim != null) glowAnim.cancel();
+        glowAnim = ValueAnimator.ofArgb(glowColor, color);
+        glowAnim.setDuration(420);
+        glowAnim.addUpdateListener(a -> {
+            glowColor = (int) a.getAnimatedValue();
+            glowShape.setColors(new int[]{glowColor, glowColor & 0x00FFFFFF});
+        });
+        glowAnim.start();
+    }
+
+    /** The banner's most vivid colour, brightened and made translucent for the glow (white banners give their logo's). */
+    private static int accent(App a) {
+        if (a.accent != 0) return a.accent;
+        int color = 0xFF6E7FD8;   // a banner with no colour at all: a calm blue
+        try {
+            Bitmap b = Bitmap.createBitmap(24, 14, Bitmap.Config.ARGB_8888);
+            Drawable d = a.banner.getConstantState() != null ? a.banner.getConstantState().newDrawable().mutate() : a.banner;
+            d.setBounds(0, 0, 24, 14); d.draw(new Canvas(b));
+            float[] hsv = new float[3]; float best = 0.2f;
+            for (int y = 0; y < 14; y++) for (int x = 0; x < 24; x++) {
+                int px = b.getPixel(x, y);
+                if (Color.alpha(px) < 128) continue;
+                Color.colorToHSV(px, hsv);
+                float score = hsv[1] * hsv[2];
+                if (score > best) { best = score; color = px; }
+            }
+            b.recycle();
+        } catch (RuntimeException ignored) { }
+        float[] hsv = new float[3]; Color.colorToHSV(color, hsv);
+        hsv[2] = Math.max(hsv[2], 0.85f);
+        a.accent = (Color.HSVToColor(hsv) & 0x00FFFFFF) | 0x52000000;
+        return a.accent;
     }
 
     private void centerInDock(View tile) {
@@ -754,11 +840,193 @@ public class MainActivity extends Activity {
         lp.setMargins(0, dp(2), 0, dp(2)); list.addView(row, lp);
     }
 
+    // ---------- cards (AdGuard Home, weather) ----------
+
+    private PopupWindow card;
+
+    private boolean dismissCards() {
+        boolean shown = false;
+        if (inputsPopup != null && inputsPopup.isShowing()) { inputsPopup.dismiss(); shown = true; }
+        if (card != null && card.isShowing()) { card.dismiss(); shown = true; }
+        return shown;
+    }
+
+    /** A drop-down card under a top-bar pill, styled like the Inputs menu; focus goes to its first focusable row. */
+    private LinearLayout showCard(View anchor, int widthDp) {
+        dismissCards();
+        LinearLayout box = new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(16), dp(14), dp(16), dp(12));
+        GradientDrawable bg = new GradientDrawable(); bg.setCornerRadius(dp(16)); bg.setColor(0xF2151B2E);
+        box.setBackground(bg);
+        card = new PopupWindow(box, dp(widthDp), ViewGroup.LayoutParams.WRAP_CONTENT, true);
+        card.setElevation(dp(16));
+        card.setAnimationStyle(android.R.style.Animation_Dialog);
+        return box;
+    }
+
+    private void openCard(View anchor, LinearLayout box) {
+        card.showAsDropDown(pills, 0, dp(8), Gravity.END);   // right-aligned with the pill row, inside the screen
+        focusFirst(box);
+    }
+
+    private static boolean focusFirst(ViewGroup g) {
+        for (int i = 0; i < g.getChildCount(); i++) {
+            View v = g.getChildAt(i);
+            if (v.isFocusable() && v.getVisibility() == View.VISIBLE) { v.requestFocus(); return true; }
+            if (v instanceof ViewGroup && focusFirst((ViewGroup) v)) return true;
+        }
+        return false;
+    }
+
+    private TextView cardText(LinearLayout box, int sp, boolean bold, int color, String s, int topDp) {
+        TextView t = text(sp, bold, color); t.setShadowLayer(0, 0, 0, 0); t.setText(s);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(topDp); box.addView(t, lp);
+        return t;
+    }
+
+    private View dot(int color) {
+        View d = new View(this);
+        GradientDrawable g = new GradientDrawable(); g.setShape(GradientDrawable.OVAL); g.setColor(color); d.setBackground(g);
+        return d;
+    }
+
+    /** A focusable action row at the bottom of a card. */
+    private void cardAction(LinearLayout box, int icon, String label, Runnable action) {
+        View row = inputRow(icon, label, Input.NONE, null);
+        row.setOnClickListener(v -> action.run());
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(40));
+        lp.topMargin = dp(8); box.addView(row, lp);
+    }
+
+    /** AdGuard Home: protection state, the last 24 hours, and pause for 5 minutes / turn back on. */
+    private void showGuard(View anchor) {
+        if (card != null && card.isShowing()) { card.dismiss(); return; }
+        LinearLayout box = showCard(anchor, 320);
+        LinearLayout head = new LinearLayout(this); head.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView shield = new ImageView(this); shield.setImageResource(R.drawable.ic_shield); shield.setImageTintList(ColorStateList.valueOf(0xFFFFFFFF));
+        head.addView(shield, new LinearLayout.LayoutParams(dp(20), dp(20)));
+        TextView title = text(16, true, 0xFFFFFFFF); title.setShadowLayer(0, 0, 0, 0); title.setText("AdGuard Home"); title.setPadding(dp(10), 0, 0, 0);
+        head.addView(title);
+        box.addView(head);
+        LinearLayout state = new LinearLayout(this); state.setGravity(Gravity.CENTER_VERTICAL);
+        View stateDot = dot(0x66FFFFFF); state.addView(stateDot, new LinearLayout.LayoutParams(dp(7), dp(7)));
+        TextView stateText = text(13, false, 0xCCFFFFFF); stateText.setShadowLayer(0, 0, 0, 0); stateText.setText("…"); stateText.setPadding(dp(8), 0, 0, 0);
+        state.addView(stateText);
+        LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT); sl.topMargin = dp(8);
+        box.addView(state, sl);
+        LinearLayout stats = new LinearLayout(this);
+        LinearLayout.LayoutParams stl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT); stl.topMargin = dp(14);
+        box.addView(stats, stl);
+        TextView caption = cardText(box, 11, false, 0x80FFFFFF, getString(R.string.ag_last_day), 6);
+        caption.setVisibility(View.GONE);
+        LinearLayout actions = new LinearLayout(this); actions.setOrientation(LinearLayout.VERTICAL);
+        box.addView(actions);
+        // something focusable while the status loads, so the card takes the remote's keys
+        cardAction(actions, R.drawable.ic_settings, getString(R.string.home_settings), () -> { card.dismiss(); launch(new Intent(this, SettingsActivity.class)); });
+        openCard(anchor, box);
+        Guard.Result<Guard.Status> show = new Guard.Result<Guard.Status>() {
+            @Override public void done(Guard.Status s, String err) {
+                if (!card.isShowing() || card.getContentView() != box) return;
+                if (err != null) { stateText.setText(err); ((GradientDrawable) stateDot.getBackground()).setColor(0xFFFF453A); return; }
+                boolean paused = !s.on && s.pausedMs > 0;
+                ((GradientDrawable) stateDot.getBackground()).setColor(s.on ? 0xFF34C759 : paused ? 0xFFFF9F0A : 0xFFFF453A);
+                stateText.setText(s.on ? getString(R.string.ag_on) : paused ? getString(R.string.ag_paused, (int) Math.ceil(s.pausedMs / 60_000.0)) : getString(R.string.ag_disabled));
+                stats.removeAllViews();
+                stat(stats, getString(R.string.ag_queries), String.format(Locale.getDefault(), "%,d", s.queries));
+                stat(stats, getString(R.string.ag_blocked), String.format(Locale.getDefault(), "%,d · %d%%", s.blocked, s.blockedPercent()));
+                stat(stats, getString(R.string.ag_speed), String.format(Locale.getDefault(), "%.0f ms", s.avgMs));
+                caption.setVisibility(View.VISIBLE);
+                actions.removeAllViews();
+                final Guard.Result<Guard.Status> again = this;
+                if (s.on) cardAction(actions, R.drawable.ic_shield, getString(R.string.ag_pause), () -> Guard.protect(MainActivity.this, 5, again));
+                else cardAction(actions, R.drawable.ic_shield, getString(R.string.ag_resume), () -> Guard.protect(MainActivity.this, 0, again));
+                focusFirst(actions);
+            }
+        };
+        Guard.status(this, show);
+    }
+
+    private void stat(LinearLayout row, String label, String value) {
+        LinearLayout col = new LinearLayout(this); col.setOrientation(LinearLayout.VERTICAL);
+        TextView v = text(17, true, 0xFFFFFFFF); v.setShadowLayer(0, 0, 0, 0); v.setText(value); v.setSingleLine(true);
+        TextView l = text(11, false, 0x99FFFFFF); l.setShadowLayer(0, 0, 0, 0); l.setText(label);
+        col.addView(v); col.addView(l);
+        row.addView(col, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+    }
+
+    /** Weather: now (feels like, humidity, wind), air quality, today and the next three days; a row to its settings. */
+    private void showWeather(View anchor) {
+        if (card != null && card.isShowing()) { card.dismiss(); return; }
+        Integer t = Sky.temperature(this);
+        if (t == null) { launch(new Intent(this, SettingsActivity.class)); return; }   // no city yet: pick one
+        org.json.JSONObject more = Sky.more(this);
+        if (more == null) Sky.refresh(this, true, this::updateWeather);   // saved before the card existed
+        LinearLayout box = showCard(anchor, 380);
+        int code = Sky.code(this);
+        LinearLayout now = new LinearLayout(this); now.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView big = new ImageView(this); big.setImageResource(Sky.icon(code, Sky.isDay(this))); big.setImageTintList(ColorStateList.valueOf(0xFFFFFFFF));
+        now.addView(big, new LinearLayout.LayoutParams(dp(40), dp(40)));
+        TextView temp = text(34, false, 0xFFFFFFFF); temp.setShadowLayer(0, 0, 0, 0); temp.setText(t + "°"); temp.setPadding(dp(12), 0, dp(12), 0);
+        now.addView(temp);
+        LinearLayout names = new LinearLayout(this); names.setOrientation(LinearLayout.VERTICAL);
+        TextView what = text(15, true, 0xFFFFFFFF); what.setShadowLayer(0, 0, 0, 0); what.setText(getString(Sky.label(code)));
+        TextView where = text(12, false, 0x99FFFFFF); where.setShadowLayer(0, 0, 0, 0); where.setText(Sky.city(this));
+        names.addView(what); names.addView(where);
+        now.addView(names);
+        box.addView(now);
+        if (more != null) {
+            String unit = Sky.fahrenheit(this) ? "mph" : "km/h";
+            cardText(box, 13, false, 0xCCFFFFFF, getString(R.string.wx_feels, (int) Math.round(more.optDouble("feels", t)))
+                    + "  ·  " + getString(R.string.wx_humidity, more.optInt("humidity"))
+                    + "  ·  " + getString(R.string.wx_wind, (int) Math.round(more.optDouble("wind")), unit), 10);
+            if (more.has("aqi")) {
+                int aqi = more.optInt("aqi");
+                LinearLayout air = new LinearLayout(this); air.setGravity(Gravity.CENTER_VERTICAL);
+                air.addView(dot(Sky.aqiColor(aqi)), new LinearLayout.LayoutParams(dp(7), dp(7)));
+                TextView at = text(13, false, 0xCCFFFFFF); at.setShadowLayer(0, 0, 0, 0); at.setPadding(dp(8), 0, 0, 0);
+                at.setText(getString(R.string.air_quality, getString(Sky.aqiLabel(aqi)), aqi));
+                air.addView(at);
+                LinearLayout.LayoutParams al = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT); al.topMargin = dp(6);
+                box.addView(air, al);
+            }
+            org.json.JSONArray days = more.optJSONArray("days");
+            if (days != null && days.length() > 0) {
+                box.addView(separator());
+                LinearLayout row = new LinearLayout(this);
+                SimpleDateFormat dayFmt = new SimpleDateFormat("EEE", getResources().getConfiguration().getLocales().get(0));
+                for (int i = 0; i < Math.min(4, days.length()); i++) {
+                    org.json.JSONArray d = days.optJSONArray(i);
+                    if (d == null) continue;
+                    LinearLayout col = new LinearLayout(this); col.setOrientation(LinearLayout.VERTICAL); col.setGravity(Gravity.CENTER_HORIZONTAL);
+                    TextView name = text(12, false, 0xB3FFFFFF); name.setShadowLayer(0, 0, 0, 0);
+                    name.setText(i == 0 ? getString(R.string.today) : dayFmt.format(new Date(d.optLong(0) * 1000)));
+                    col.addView(name);
+                    ImageView ic = new ImageView(this); ic.setImageResource(Sky.icon(d.optInt(1), true)); ic.setImageTintList(ColorStateList.valueOf(0xFFFFFFFF));
+                    LinearLayout.LayoutParams il = new LinearLayout.LayoutParams(dp(22), dp(22)); il.topMargin = dp(6); il.bottomMargin = dp(6);
+                    col.addView(ic, il);
+                    TextView range = text(13, false, 0xFFFFFFFF); range.setShadowLayer(0, 0, 0, 0);
+                    range.setText(Math.round(d.optDouble(2)) + "° / " + Math.round(d.optDouble(3)) + "°");
+                    col.addView(range);
+                    int rain = d.optInt(4, -1);
+                    if (rain > 0) {
+                        TextView r = text(11, false, 0xFF64D2FF); r.setShadowLayer(0, 0, 0, 0); r.setText(getString(R.string.wx_rain_chance, rain));
+                        col.addView(r);
+                    }
+                    row.addView(col, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+                }
+                box.addView(row);
+            }
+        }
+        cardAction(box, R.drawable.ic_settings, getString(R.string.weather_settings), () -> { card.dismiss(); launch(new Intent(this, SettingsActivity.class)); });
+        openCard(anchor, box);
+    }
+
     // ---------- weather ----------
 
     private int wallpaperMinutes() { return prefs.getInt("wallpaper_minutes", getResources().getInteger(R.integer.wallpaper_minutes)); }
 
-    /** Icon and temperature; focused, it also names the weather and the city. OK opens Home settings. */
+    /** Icon and temperature; focused, it also names the weather and the city. OK opens the weather card. */
     private View weatherPill() {
         LinearLayout p = new LinearLayout(this); p.setOrientation(LinearLayout.HORIZONTAL); p.setGravity(Gravity.CENTER_VERTICAL);
         p.setPadding(dp(10), 0, dp(12), 0);
@@ -776,7 +1044,7 @@ public class MainActivity extends Activity {
             updateWeather();
             v.animate().scaleX(f ? 1.06f : 1f).scaleY(f ? 1.06f : 1f).setDuration(200).setInterpolator(SPRING).start();
         });
-        p.setOnClickListener(v -> launch(new Intent(this, SettingsActivity.class)));
+        p.setOnClickListener(this::showWeather);
         p.setVisibility(View.GONE);   // until the first forecast arrives
         return p;
     }
