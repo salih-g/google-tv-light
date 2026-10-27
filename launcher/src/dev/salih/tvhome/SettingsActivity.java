@@ -69,6 +69,11 @@ public final class SettingsActivity extends Activity {
         boolean ourHome = HomeSwitch.ourHome(this), ourDream = HomeSwitch.ourDream(this);
         row(getString(R.string.home_screen), getString(ourHome ? R.string.this_home : R.string.google_home), this::switchHome);
         row(getString(R.string.screensaver), getString(ourDream ? R.string.this_dream : R.string.google_dream), () -> switchDream(!ourDream));
+        boolean byUse = prefs.getBoolean(Usage.PREF, false);
+        row(getString(R.string.dock_order), getString(byUse ? R.string.dock_by_use : R.string.dock_arranged), () -> {
+            if (byUse || Usage.allowed(this)) { prefs.edit().putBoolean(Usage.PREF, !byUse).apply(); build(); }
+            else adbJob(() -> Usage.allow(this, prompt), () -> { prefs.edit().putBoolean(Usage.PREF, true).apply(); build(); });
+        });
 
         section(R.string.section_keys);
         for (int i = 0; i < KEYS.length; i++) { final int code = KEYS[i]; row(getString(KEY_LABELS[i]), keyValue(code), () -> pickKeyApp(code)); }

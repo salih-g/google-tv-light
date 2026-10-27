@@ -10,6 +10,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- granted over ADB (Home settings, tvclean): lets Home turn the app-button service back on by itself -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+    <!-- usage access (GET_USAGE_STATS app-op, set over ADB) for the "most used first" dock order -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
     <!-- Android 11 only reveals the Wi-Fi name to apps holding location; granted over ADB at install. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 

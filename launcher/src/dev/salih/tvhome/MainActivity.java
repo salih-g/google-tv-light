@@ -51,8 +51,10 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Set;
 
@@ -141,6 +143,13 @@ public class MainActivity extends Activity {
         updateWeather();
         Sky.refresh(this, false, this::updateWeather);
         loadApps(); // picks up installs that happened while another app was in front
+        if (prefs.getBoolean(Usage.PREF, false)) {
+            Context app = getApplicationContext();
+            new Thread(() -> {
+                Map<String, Integer> fresh = Usage.opens(app);
+                handler.post(() -> { if (!fresh.equals(opens)) { opens = fresh; fillDock(); } });
+            }).start();
+        }
         if (gridOnResume) { gridOnResume = false; showGrid(); } else showDock(false);
     }
 
@@ -402,11 +411,17 @@ public class MainActivity extends Activity {
         fillDock(lastDockFocus != null && lastDockFocus.getTag() instanceof App ? ((App) lastDockFocus.getTag()).pkg : null);
     }
 
+    /** Opens per app over the last 30 days (Usage), when the dock is ordered by use; empty otherwise. */
+    private Map<String, Integer> opens = new HashMap<>();
+
+    private boolean dockByUse() { return prefs.getBoolean(Usage.PREF, false); }
+
     private void fillDock(String focusedPkg) {
         dock.removeAllViews(); lastDockFocus = null;
         List<App> order = new ArrayList<>();
         for (String pkg : dockPackages()) { App a = find(pkg); if (a != null) order.add(a); }
         if (order.isEmpty()) order = apps.subList(0, Math.min(7, apps.size())); // nothing configured is installed
+        else if (dockByUse()) Collections.sort(order, (x, y) -> opens.getOrDefault(y.pkg, 0) - opens.getOrDefault(x.pkg, 0)); // stable: ties keep the arranged order
         int w = dp(112), h = dp(63);
         for (App a : order) {
             View tile = tile(a, w, h);
@@ -471,7 +486,10 @@ public class MainActivity extends Activity {
         list.setBackground(bg);
         PopupWindow[] popup = new PopupWindow[1];
         Runnable[] actions; String[] labels;
-        if (inDock) {
+        if (inDock && dockByUse()) {   // the order follows use; only removing makes sense here
+            labels = new String[]{getString(R.string.remove_from_dock)};
+            actions = new Runnable[]{() -> { pkgs.remove(a.pkg); saveDock(pkgs); fillDock(null); }};
+        } else if (inDock) {
             labels = new String[]{getString(R.string.move_left), getString(R.string.move_right), getString(R.string.remove_from_dock)};
             actions = new Runnable[]{
                 () -> { if (idx > 0) { Collections.swap(pkgs, idx, idx - 1); saveDock(pkgs); fillDock(a.pkg); } },

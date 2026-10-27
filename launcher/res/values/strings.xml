@@ -63,4 +63,7 @@
     <string name="input_on">On</string>
     <string name="input_off">Off</string>
     <string name="other_inputs">Other inputs</string>
+    <string name="dock_order">Dock order</string>
+    <string name="dock_arranged">As arranged</string>
+    <string name="dock_by_use">Most used first</string>
 </resources>

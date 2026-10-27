@@ -63,4 +63,7 @@
     <string name="input_on">Açık</string>
     <string name="input_off">Kapalı</string>
     <string name="other_inputs">Diğer girişler</string>
+    <string name="dock_order">Dock sıralaması</string>
+    <string name="dock_arranged">Benim düzenim</string>
+    <string name="dock_by_use">En çok kullanılan önce</string>
 </resources>
