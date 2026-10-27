@@ -28,6 +28,7 @@ list. How this one was built:
 | `08-sleep-stock-home.txt` | Google TV home + setup wizard, needed for a third-party Home key |
 | `09-wake-panel-buttons.txt` | `wake`: key help back, it drives the TV's own panel buttons (it was in `04`) |
 | `10-wake-initsetup.txt` | `wake`: first-run setup back, it also owns channel scanning (it was in `04`) |
+| `11-sleep-google-leftovers.txt` | Google's one-time initializer, which still runs at every boot |
 
 Known-bad on some TCL models (keep in `protected.py` unless you have tested): `com.android.location.fused`
 (bootloop reports), `com.tcl.waterfall.overseas` (bootloop reports when *uninstalled*; sleeping it was fine here).

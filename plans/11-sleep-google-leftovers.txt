@@ -1,0 +1,5 @@
+# Batch 7: Google's one-time initializer, which still runs at every boot (BOOT_COMPLETED receiver) long after
+# setup. Disabled on the same TCL firmware by cleanyourtv (examples/tcl-43c645) with no side effect.
+# Kept: com.google.android.videos (Google Play Movies, used); TalkBack (not running, no boot receiver: nothing to
+# gain, and it is accessibility). Rakuten TV (tv.wuaki.apptv) came disabled.
+com.google.android.onetimeinitializer       # first-boot initializer, done long ago
