@@ -59,4 +59,8 @@
     <string name="wx_storm">Gök gürültülü</string>
     <string name="minutes">%d dakikada bir</string>
     <string name="set_city">Şehir seç</string>
+    <string name="input_connected">Bağlı</string>
+    <string name="input_on">Açık</string>
+    <string name="input_off">Kapalı</string>
+    <string name="other_inputs">Diğer girişler</string>
 </resources>

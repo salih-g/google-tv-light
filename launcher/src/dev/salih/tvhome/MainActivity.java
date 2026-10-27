@@ -483,7 +483,7 @@ public class MainActivity extends Activity {
         }
         for (int i = 0; i < labels.length; i++) {
             final Runnable act = actions[i];
-            View p = inputPill(new Input(labels[i], 0, () -> { popup[0].dismiss(); act.run(); showDock(false); }));
+            View p = inputPill(new Input(labels[i], 0, Input.OTHER, Input.NONE, () -> { popup[0].dismiss(); act.run(); showDock(false); }));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(36));
             lp.setMargins(0, dp(3), 0, dp(3)); list.addView(p, lp);
         }
@@ -493,7 +493,7 @@ public class MainActivity extends Activity {
             list.measure(View.MeasureSpec.makeMeasureSpec(dp(230), View.MeasureSpec.EXACTLY), View.MeasureSpec.UNSPECIFIED);
             popup[0].showAsDropDown(tile, 0, -tile.getHeight() - list.getMeasuredHeight() - dp(40));
         } else popup[0].showAsDropDown(tile, 0, -dp(8));
-        list.getChildAt(0).requestFocus();
+        for (int i = 0; i < list.getChildCount(); i++) if (list.getChildAt(i).isFocusable()) { list.getChildAt(i).requestFocus(); break; }
     }
 
     private void setFocusedName(String name) {
@@ -540,22 +540,54 @@ public class MainActivity extends Activity {
 
     // ---------- inputs ----------
 
-    private static final class Input { final String label; final int icon; final Runnable open; Input(String l, int i, Runnable o) { label = l; icon = i; open = o; } }
+    /**
+     * kind: HDMI, another passthrough port (AV), or the Live TV app. power: ON/OFF for a device the TV knows by HDMI-CEC,
+     * PLUGGED for a port with something in it but no power info, EMPTY for a port with nothing in it (or AV, which has
+     * no hotplug detection), NONE for Live TV.
+     */
+    private static final class Input {
+        static final int HDMI = 0, OTHER = 1, LIVE = 2;
+        static final int NONE = 0, EMPTY = 1, PLUGGED = 2, OFF = 3, ON = 4;
+        final String label; final int icon, kind, power; final Runnable open;
+        Input(String l, int i, int k, int p, Runnable o) { label = l; icon = i; kind = k; power = p; open = o; }
+        boolean device() { return power >= PLUGGED; }
+    }
 
+    /**
+     * Devices first (on, then off), then the empty ports, then Live TV. The public input state can't tell a sleeping
+     * device from an empty port on this TCL (both CONNECTED_STANDBY on the port, and the CEC device's own input stays
+     * CONNECTED while it sleeps), so a CEC device's power comes from Cec; a port with a CEC device behind it shows the
+     * device (its input switches to the port and wakes it) instead of the bare port.
+     */
     private List<Input> inputs() {
         List<Input> list = new ArrayList<>();
         String liveTv = getString(R.string.live_tv_package);
         Intent live = getPackageManager().getLeanbackLaunchIntentForPackage(liveTv);
         if (live == null) live = getPackageManager().getLaunchIntentForPackage(liveTv);
         final boolean hasTvApp = live != null;
-        if (hasTvApp) { final Intent li = live; list.add(new Input(getString(R.string.live_tv), R.drawable.ic_live_tv, () -> launch(li))); }
         TvInputManager tim = (TvInputManager) getSystemService(Context.TV_INPUT_SERVICE);
-        if (tim != null) for (TvInputInfo t : tim.getTvInputList()) {
-            if (!t.isPassthroughInput()) continue;
-            CharSequence custom = t.loadCustomLabel(this), name = t.loadLabel(this); // custom = the name the owner gave the input (e.g. "PlayStation 5")
-            String label = custom != null && custom.length() > 0 ? custom.toString() : name == null ? t.getId() : name.toString();
+        List<TvInputInfo> all = new ArrayList<>();
+        if (tim != null) for (TvInputInfo t : tim.getTvInputList()) if (t.isPassthroughInput()) all.add(t);
+        java.util.Set<String> parents = new java.util.HashSet<>();
+        int children = 0;
+        for (TvInputInfo t : all) if (t.getParentId() != null) { parents.add(t.getParentId()); children++; }
+        for (TvInputInfo t : all) {
             final String id = t.getId();
-            list.add(new Input(label, R.drawable.ic_hdmi, () -> {
+            if (parents.contains(id)) continue;   // its CEC device stands for it
+            CharSequence custom = t.loadCustomLabel(this), name = t.loadLabel(this); // custom = the name the owner gave the input (e.g. "PlayStation 5")
+            String label = custom != null && custom.length() > 0 ? custom.toString() : name == null ? id : name.toString();
+            boolean isHdmi = t.getType() == TvInputInfo.TYPE_HDMI;
+            int power;
+            if (t.getParentId() != null) {
+                Cec.Device d = Cec.byName(name == null ? null : name.toString());
+                if (d == null && children == 1) d = Cec.only();
+                power = d == null ? Input.PLUGGED : d.on() ? Input.ON : Input.OFF;
+            } else {
+                int state;
+                try { state = isHdmi ? tim.getInputState(id) : -1; } catch (RuntimeException e) { state = -1; }
+                power = state == TvInputManager.INPUT_STATE_CONNECTED ? Input.PLUGGED : Input.EMPTY;
+            }
+            list.add(new Input(label, isHdmi ? R.drawable.ic_hdmi : R.drawable.ic_av, isHdmi ? Input.HDMI : Input.OTHER, power, () -> {
                 Intent i = new Intent(Intent.ACTION_VIEW, TvContract.buildChannelUriForPassthroughInput(id));
                 if (hasTvApp) i.setPackage(liveTv); // the TV app renders passthrough inputs
                 try { startActivity(i); } catch (RuntimeException e) {
@@ -564,7 +596,49 @@ public class MainActivity extends Activity {
                 }
             }));
         }
+        // Stable sort: devices on, then off/plugged, then empty ports; HDMI before AV within each, in the TV's order.
+        java.util.Collections.sort(list, (a, b) -> a.power != b.power ? b.power - a.power : a.kind - b.kind);
+        if (hasTvApp) { final Intent li = live; list.add(new Input(getString(R.string.live_tv), R.drawable.ic_live_tv, Input.LIVE, Input.NONE, () -> launch(li))); }
         return list;
+    }
+
+    /** A row of the Inputs drop-down: icon, name, and for a device a green (on) or red (off) dot with its state. */
+    private View inputRow(int icon, String label, int power, String extra) {
+        LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL); row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(14), 0, dp(14), 0); row.setFocusable(true); row.setClickable(true);
+        GradientDrawable bg = new GradientDrawable(); bg.setCornerRadius(dp(12)); bg.setColor(0x00000000); row.setBackground(bg);
+        ImageView iv = new ImageView(this); iv.setImageResource(icon); iv.setImageTintList(ColorStateList.valueOf(0xFFFFFFFF));
+        row.addView(iv, new LinearLayout.LayoutParams(dp(18), dp(18)));
+        TextView name = text(14, false, 0xFFFFFFFF); name.setShadowLayer(0, 0, 0, 0); name.setText(label); name.setSingleLine(true);
+        name.setEllipsize(android.text.TextUtils.TruncateAt.END); name.setPadding(dp(12), 0, dp(8), 0);
+        row.addView(name, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        TextView status = null;
+        if (power >= Input.PLUGGED) {
+            View dot = new View(this);
+            GradientDrawable d = new GradientDrawable(); d.setShape(GradientDrawable.OVAL);
+            d.setColor(power == Input.OFF ? 0xFFFF453A : 0xFF34C759); dot.setBackground(d);
+            LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(dp(7), dp(7)); dl.setMarginEnd(dp(6)); row.addView(dot, dl);
+        }
+        if (power >= Input.PLUGGED || extra != null) {
+            status = text(11, false, 0x99FFFFFF); status.setShadowLayer(0, 0, 0, 0);
+            status.setText(extra != null ? extra : getString(power == Input.ON ? R.string.input_on : power == Input.OFF ? R.string.input_off : R.string.input_connected));
+            row.addView(status);
+        }
+        final TextView st = status;
+        row.setOnFocusChangeListener((v, f) -> {
+            bg.setColor(f ? 0xF2FFFFFF : 0x00000000);
+            iv.setImageTintList(ColorStateList.valueOf(f ? 0xFF111111 : 0xFFFFFFFF));
+            name.setTextColor(f ? 0xFF111111 : 0xFFFFFFFF);
+            if (st != null) st.setTextColor(f ? 0x99111111 : 0x99FFFFFF);
+        });
+        return row;
+    }
+
+    private View separator() {
+        View v = new View(this); v.setBackgroundColor(0x26FFFFFF);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, dp(1) / 2));
+        lp.setMargins(dp(14), dp(6), dp(14), dp(6)); v.setLayoutParams(lp);
+        return v;
     }
 
     /** Pill variant whose label is always visible, for the inputs row and popups. */
@@ -579,35 +653,86 @@ public class MainActivity extends Activity {
         return p;
     }
 
+    /** The grid's Inputs row: devices and Live TV; empty ports stay in the drop-down's "Other inputs". */
     private void fillInputsRow() {
         inputsRow.removeAllViews();
         for (Input in : inputs()) {
+            if (in.power == Input.EMPTY) continue;
             View p = inputPill(in);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(36));
             lp.setMarginEnd(dp(10)); inputsRow.addView(p, lp);
         }
     }
 
+    private boolean inputsExpanded;
+
     private void showInputs(View anchor) {
         if (inputsPopup != null && inputsPopup.isShowing()) { inputsPopup.dismiss(); return; }
-        List<Input> ins = inputs();
-        if (ins.isEmpty()) { launch(new Intent(Settings.ACTION_SETTINGS)); return; }
         LinearLayout list = new LinearLayout(this); list.setOrientation(LinearLayout.VERTICAL);
         list.setPadding(dp(8), dp(8), dp(8), dp(8));
         GradientDrawable bg = new GradientDrawable(); bg.setCornerRadius(dp(16)); bg.setColor(0xF2151B2E);
         list.setBackground(bg);
-        for (Input in : ins) {
-            View p = inputPill(in);
-            p.setOnClickListener(v -> { inputsPopup.dismiss(); in.open.run(); });
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(36));
-            lp.setMargins(0, dp(3), 0, dp(3)); list.addView(p, lp);
-        }
-        inputsPopup = new PopupWindow(list, dp(250), ViewGroup.LayoutParams.WRAP_CONTENT, true);
+        inputsExpanded = false;
+        if (!fillInputs(list, 0)) { launch(new Intent(Settings.ACTION_SETTINGS)); return; }
+        inputsPopup = new PopupWindow(list, dp(300), ViewGroup.LayoutParams.WRAP_CONTENT, true);
         inputsPopup.setElevation(dp(16));
         inputsPopup.setAnimationStyle(android.R.style.Animation_Dialog);
         if (anchor != null) inputsPopup.showAsDropDown(anchor, 0, dp(8));
         else inputsPopup.showAtLocation(root, Gravity.TOP | Gravity.END, dp(48), dp(84));
-        list.getChildAt(0).requestFocus();
+        // Power states come from the TV's CEC service in the background; redraw in place if they changed.
+        final PopupWindow shown = inputsPopup;
+        Cec.refresh(this, () -> {
+            if (shown != inputsPopup || !shown.isShowing()) return;
+            View f = list.findFocus();
+            fillInputs(list, f == null ? 0 : Math.max(0, list.indexOfChild(f)));
+        });
+    }
+
+    /** (Re)builds the drop-down's rows and focuses the row at `focusIndex`; false when there is nothing to show. */
+    private boolean fillInputs(LinearLayout list, int focusIndex) {
+        List<Input> ins = inputs();
+        if (ins.isEmpty()) return false;
+        list.removeAllViews();
+        List<Input> empty = new ArrayList<>();
+        Input liveTv = null;
+        boolean any = false;
+        for (Input in : ins) {
+            if (in.kind == Input.LIVE) { liveTv = in; continue; }
+            if (in.power == Input.EMPTY) { empty.add(in); continue; }
+            addInputRow(list, in); any = true;
+        }
+        if (!empty.isEmpty()) {
+            if (any) list.addView(separator());
+            if (inputsExpanded || !any) for (Input in : empty) addInputRow(list, in);
+            else {
+                View more = inputRow(R.drawable.ic_more, getString(R.string.other_inputs), Input.NONE, String.valueOf(empty.size()));
+                more.setOnClickListener(v -> {
+                    inputsExpanded = true;
+                    int at = list.indexOfChild(v);
+                    fillInputs(list, at);
+                });
+                addRow(list, more);
+            }
+        }
+        if (liveTv != null) {
+            if (list.getChildCount() > 0) list.addView(separator());
+            addInputRow(list, liveTv);
+        }
+        View target = list.getChildAt(Math.min(focusIndex, list.getChildCount() - 1));
+        if (target == null || !target.isFocusable()) target = list.getChildAt(0);
+        if (target != null) target.requestFocus();
+        return true;
+    }
+
+    private void addInputRow(LinearLayout list, Input in) {
+        View row = inputRow(in.icon, in.label, in.power, null);
+        row.setOnClickListener(v -> { inputsPopup.dismiss(); in.open.run(); });
+        addRow(list, row);
+    }
+
+    private void addRow(LinearLayout list, View row) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(40));
+        lp.setMargins(0, dp(2), 0, dp(2)); list.addView(row, lp);
     }
 
     // ---------- weather ----------

@@ -59,4 +59,8 @@
     <string name="wx_storm">Thunderstorm</string>
     <string name="minutes">%d minutes</string>
     <string name="set_city">Set city</string>
+    <string name="input_connected">Connected</string>
+    <string name="input_on">On</string>
+    <string name="input_off">Off</string>
+    <string name="other_inputs">Other inputs</string>
 </resources>
