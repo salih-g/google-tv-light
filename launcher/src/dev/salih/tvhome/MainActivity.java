@@ -160,6 +160,7 @@ public class MainActivity extends Activity {
 
     @Override protected void onPause() {
         super.onPause();
+        stopMoving();
         wallpapers.stop();
         handler.removeCallbacks(minuteTick);
         if (receiverRegistered) { unregisterReceiver(packageReceiver); receiverRegistered = false; }
@@ -199,6 +200,21 @@ public class MainActivity extends Activity {
     /** Very slow zoom on the wallpaper layer (both frames), the way Apple TV screensavers breathe. */
 
     // ---------- keys ----------
+
+    /** Move mode takes the arrows, OK and Back before the focused tile does (OK would open the app). */
+    @Override public boolean dispatchKeyEvent(KeyEvent e) {
+        if (moving != null && gridPanel.getVisibility() == View.VISIBLE) {
+            int code = e.getKeyCode();
+            boolean ours = code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT || code == KeyEvent.KEYCODE_DPAD_UP
+                    || code == KeyEvent.KEYCODE_DPAD_DOWN || code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER
+                    || code == KeyEvent.KEYCODE_BACK;
+            if (ours) {
+                if (e.getAction() == KeyEvent.ACTION_DOWN) moveStep(code);
+                return true;
+            }
+        }
+        return super.dispatchKeyEvent(e);
+    }
 
     @Override public boolean onKeyDown(int code, KeyEvent e) {
         switch (code) {
@@ -345,7 +361,7 @@ public class MainActivity extends Activity {
         scroll.setVerticalScrollBarEnabled(false);
         LinearLayout column = new LinearLayout(this); column.setOrientation(LinearLayout.VERTICAL);
         column.setPadding(dp(48), dp(40), dp(48), dp(48)); column.setClipChildren(false); column.setClipToPadding(false);
-        TextView h1 = text(13, false, 0xB3FFFFFF); h1.setText(getString(R.string.apps)); column.addView(h1);
+        gridTitle = text(13, false, 0xB3FFFFFF); gridTitle.setText(getString(R.string.apps)); column.addView(gridTitle);
         grid = new GridLayout(this); grid.setColumnCount(getResources().getInteger(R.integer.columns));
         grid.setClipChildren(false); grid.setClipToPadding(false);
         LinearLayout.LayoutParams gl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -413,6 +429,12 @@ public class MainActivity extends Activity {
             list.add(new App(pkg, String.valueOf(ri.loadLabel(pm)), new ComponentName(pkg, ri.activityInfo.name), banner));
         }
         Collections.sort(list, (a, b) -> a.label.compareToIgnoreCase(b.label));
+        // The owner's grid order (move mode) first; apps installed since then follow, alphabetically.
+        List<String> order = Arrays.asList(prefs.getString("grid_order", "").split(","));
+        Collections.sort(list, (a, b) -> {
+            int i = order.indexOf(a.pkg), j = order.indexOf(b.pkg);
+            return i < 0 && j < 0 ? 0 : i < 0 ? 1 : j < 0 ? -1 : i - j;   // stable: unknown ones keep A-Z
+        });
         apps = list;
         fillDock(); fillGrid(); fillInputsRow();
     }
@@ -518,12 +540,14 @@ public class MainActivity extends Activity {
                 () -> { pkgs.remove(a.pkg); saveDock(pkgs); fillDock(null); }};
         } else {
             boolean present = idx >= 0;
-            labels = new String[]{getString(present ? R.string.remove_from_dock : R.string.add_to_dock)};
-            actions = new Runnable[]{() -> { if (present) pkgs.remove(a.pkg); else pkgs.add(a.pkg); saveDock(pkgs); fillDock(null); }};
+            labels = new String[]{getString(R.string.move), getString(present ? R.string.remove_from_dock : R.string.add_to_dock)};
+            actions = new Runnable[]{() -> startMoving(a),
+                    () -> { if (present) pkgs.remove(a.pkg); else pkgs.add(a.pkg); saveDock(pkgs); fillDock(null); }};
         }
         for (int i = 0; i < labels.length; i++) {
             final Runnable act = actions[i];
-            View p = inputPill(new Input(labels[i], 0, Input.OTHER, Input.NONE, () -> { popup[0].dismiss(); act.run(); showDock(false); }));
+            boolean move = !inDock && i == 0;
+            View p = inputPill(new Input(labels[i], 0, Input.OTHER, Input.NONE, () -> { popup[0].dismiss(); act.run(); if (!move) showDock(false); }));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(36));
             lp.setMargins(0, dp(3), 0, dp(3)); list.addView(p, lp);
         }
@@ -541,6 +565,61 @@ public class MainActivity extends Activity {
         focusedName.animate().cancel();
         focusedName.setAlpha(0f); focusedName.setTranslationY(dp(6)); focusedName.setText(name);
         focusedName.animate().alpha(1f).translationY(0f).setDuration(220).setInterpolator(new DecelerateInterpolator()).start();
+    }
+
+    // ---------- grid move mode ----------
+
+    private TextView gridTitle;
+    private App moving;   // the app being moved in the grid, null outside move mode
+
+    /** Move mode: the arrows carry the app through the grid, OK or Back drops it there and saves the order. */
+    private void startMoving(App a) {
+        moving = a;
+        gridTitle.setText(getString(R.string.moving, a.label));
+        focusGridApp(a);
+    }
+
+    private void stopMoving() {
+        if (moving == null) return;
+        App a = moving; moving = null;
+        List<String> order = new ArrayList<>();
+        for (App x : apps) order.add(x.pkg);
+        prefs.edit().putString("grid_order", String.join(",", order)).apply();
+        gridTitle.setText(getString(R.string.apps));
+        focusGridApp(a);
+    }
+
+    /** One step in move mode. */
+    private void moveStep(int code) {
+        int i = apps.indexOf(moving), cols = grid.getColumnCount(), to;
+        switch (code) {
+            case KeyEvent.KEYCODE_DPAD_LEFT: to = i - 1; break;
+            case KeyEvent.KEYCODE_DPAD_RIGHT: to = i + 1; break;
+            case KeyEvent.KEYCODE_DPAD_UP: to = i - cols; break;
+            case KeyEvent.KEYCODE_DPAD_DOWN: to = i + cols; break;
+            default: stopMoving(); return;   // OK, Back
+        }
+        if (i < 0 || to < 0 || to >= apps.size()) return;   // edge: stay put
+        List<App> list = new ArrayList<>(apps);
+        list.remove(i); list.add(to, moving);
+        apps = list;
+        fillGrid();
+        focusGridApp(moving);
+    }
+
+    /** Focuses an app's grid tile; in move mode it is lifted with a white outline. */
+    private void focusGridApp(App a) {
+        for (int k = 0; k < grid.getChildCount(); k++) {
+            View t = grid.getChildAt(k);
+            boolean lifted = moving != null && t.getTag() == moving;
+            t.setForeground(lifted ? movingOutline() : null);
+            if (t.getTag() == a) { prevFocus = null; t.requestFocus(); }
+        }
+    }
+
+    private Drawable movingOutline() {
+        GradientDrawable g = new GradientDrawable(); g.setCornerRadius(dp(8)); g.setStroke(dp(3), 0xFFFFFFFF); g.setColor(0x1AFFFFFF);
+        return g;
     }
 
     // ---------- glass slab and glow ----------

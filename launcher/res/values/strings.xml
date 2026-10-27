@@ -96,4 +96,6 @@
     <string name="aqi_very">very unhealthy</string>
     <string name="aqi_hazardous">hazardous</string>
     <string name="ag_wrong_login">Wrong user or password (Home settings)</string>
+    <string name="move">Move</string>
+    <string name="moving">Moving %1$s: arrows to move, OK to finish</string>
 </resources>

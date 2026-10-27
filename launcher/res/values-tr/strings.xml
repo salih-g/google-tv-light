@@ -96,4 +96,6 @@
     <string name="aqi_very">çok sağlıksız</string>
     <string name="aqi_hazardous">tehlikeli</string>
     <string name="ag_wrong_login">Kullanıcı adı ya da şifre yanlış (Home ayarları)</string>
+    <string name="move">Taşı</string>
+    <string name="moving">%1$s taşınıyor: oklarla taşı, bitirmek için OK</string>
 </resources>
