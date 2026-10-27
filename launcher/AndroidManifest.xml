@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Weather and sunrise/sunset from Open-Meteo (Sky), and the TV's own ADB on 127.0.0.1 (Adb). -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- granted over ADB (Home settings, tvclean): lets Home turn the app-button service back on by itself -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
     <!-- Android 11 only reveals the Wi-Fi name to apps holding location; granted over ADB at install. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 

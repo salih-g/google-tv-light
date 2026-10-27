@@ -123,6 +123,7 @@ public class MainActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
+        if (!HomeSwitch.keysOn(this)) new Thread(() -> HomeSwitch.repairKeys(getApplicationContext())).start();
         wallpapers.start();
         handler.post(minuteTick);
         if (!receiverRegistered) {

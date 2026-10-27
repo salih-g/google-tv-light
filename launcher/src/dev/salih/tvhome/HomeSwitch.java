@@ -1,5 +1,6 @@
 package dev.salih.tvhome;
 
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -12,6 +13,7 @@ import java.io.IOException;
  * Switches the TV between this Home and Google TV's own, and between this screensaver and Google's, from the TV
  * itself (Home settings and the crash watchdog). Runs only the fixed commands below through the TV's own ADB (Adb);
  * the first use shows the TV's "Allow USB debugging?" prompt once. Blocking: call off the main thread.
+ * repairKeys writes the accessibility setting itself, with the WRITE_SECURE_SETTINGS grant useOurHome made.
  */
 final class HomeSwitch {
     static final String STOCK_HOME = "com.google.android.apps.tv.launcherx";
@@ -51,14 +53,62 @@ final class HomeSwitch {
             adb.shell("pm disable-user --user 0 " + SETUP_HOME);
             expect(adb.shell("cmd package set-home-activity " + OUR_HOME), "Success");
             adb.shell("appops set dev.salih.tvhome APP_AUTO_START allow");   // TCL's auto-start gate (Safety Guard's switch)
-            String keys = adb.shell("settings get secure enabled_accessibility_services").trim();
-            if (!keys.contains(OUR_KEYS)) {
-                String list = keys.isEmpty() || keys.equals("null") ? OUR_KEYS : keys + ":" + OUR_KEYS;
-                adb.shell("settings put secure enabled_accessibility_services " + list);
-                adb.shell("settings put secure accessibility_enabled 1");
-            }
+            adb.shell("pm grant dev.salih.tvhome " + WRITE_SECURE_SETTINGS);   // lets repairKeys work without ADB
+            enableKeys(c);
             Watchdog.clear(c);
         }
+    }
+
+    // ---------- the remote's app-button service ----------
+
+    private static final String WRITE_SECURE_SETTINGS = "android.permission.WRITE_SECURE_SETTINGS";
+
+    /**
+     * Puts the remote's app-button service (KeyService) back when something turned it off: Settings, an accessibility
+     * reset after a firmware update, TCL's Safety Guard. Called each time Home shows; nothing to do while it is on.
+     * Uses the WRITE_SECURE_SETTINGS grant useOurHome makes; a TV switched before that grant existed gets it here over
+     * the TV's ADB (2 s for a prompt; a key not allowed yet leaves the service off, as before).
+     * Blocking when it has work: call off the main thread.
+     */
+    static void repairKeys(Context c) {
+        if (!ourHome(c) || keysOn(c)) return;
+        try {
+            if (c.checkSelfPermission(WRITE_SECURE_SETTINGS) != PackageManager.PERMISSION_GRANTED) {
+                try (Adb adb = Adb.connect(c, 2000, null)) { adb.shell("pm grant dev.salih.tvhome " + WRITE_SECURE_SETTINGS); }
+            }
+            enableKeys(c);
+        } catch (IOException | RuntimeException ignored) {
+            // ADB off or the grant refused: Home works, the app buttons stay with the TV until Home settings fixes it
+        }
+    }
+
+    static boolean keysOn(Context c) {
+        return enabledServices(c).contains(KEYS)
+                && Settings.Secure.getInt(c.getContentResolver(), Settings.Secure.ACCESSIBILITY_ENABLED, 0) == 1;
+    }
+
+    private static final ComponentName KEYS = ComponentName.unflattenFromString(OUR_KEYS);
+
+    /** Adds KeyService to the enabled accessibility services, keeping the others (TalkBack and so on). */
+    private static void enableKeys(Context c) {
+        java.util.Set<ComponentName> on = enabledServices(c);
+        if (!on.contains(KEYS)) {
+            String current = Settings.Secure.getString(c.getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+            String list = current == null || current.isEmpty() ? OUR_KEYS : current + ":" + OUR_KEYS;
+            Settings.Secure.putString(c.getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, list);
+        }
+        Settings.Secure.putInt(c.getContentResolver(), Settings.Secure.ACCESSIBILITY_ENABLED, 1);
+    }
+
+    /** The enabled services as components ("pkg/.Cls" and "pkg/pkg.Cls" are the same service). */
+    private static java.util.Set<ComponentName> enabledServices(Context c) {
+        java.util.Set<ComponentName> set = new java.util.HashSet<>();
+        String v = Settings.Secure.getString(c.getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        if (v != null) for (String part : v.split(":")) {
+            ComponentName cn = ComponentName.unflattenFromString(part.trim());
+            if (cn != null) set.add(cn);
+        }
+        return set;
     }
 
     /** Google TV's Home back, exactly as it came; this app stays installed. */
