@@ -27,6 +27,8 @@ Usage
   tvclean.py uninstall <plan.txt> [--yes]  remove Play Store apps listed in the plan
   tvclean.py restore <snapshot.json> [--yes]  re-enable everything that was enabled in the snapshot
   tvclean.py home check | home set <pkg/.Activity> [--yes] | home reset [--yes]
+  tvclean.py check [--fix] [--yes]       after a firmware update: compare the TV with plans/ (and Home, the remote
+                                         key service); --fix --yes re-applies what drifted. Exit 0 ok, 1 drift, 2 no TV
   tvclean.py shell '<cmd>'               one read-only shell command
 
 TV address: TV_HOST env or .tv_host file next to this script.
@@ -47,6 +49,7 @@ from protected import KEEP_APPS, is_protected  # noqa: E402
 SNAPSHOTS = os.path.join(HERE, "snapshots")
 KEY = os.path.join(HERE, ".adbkey", "adbkey")
 STOCK_HOME = "com.google.android.apps.tv.launcherx/.home.HomeActivity"
+PLANS_DIR = os.path.join(HERE, "plans")
 
 
 # ---------- connection ----------
@@ -397,6 +400,77 @@ def cmd_home(dev, args):
         cmd_home(dev, ["check"])
 
 
+# ---------- drift check (after a firmware update) ----------
+
+OUR_HOME = "dev.salih.tvhome/.MainActivity"
+OUR_KEYS = "dev.salih.tvhome/.KeyService"
+
+
+def expected_states() -> dict:
+    """What plans/ leaves each package as: "off" (sleep), "removed" (remove), "absent" (uninstall) or "on" (wake/readd).
+    Plans apply in file-name order, so a later wake undoes an earlier sleep."""
+    kinds = {"sleep": "off", "remove": "removed", "uninstall": "absent", "wake": "on", "readd": "on"}
+    want = {}
+    for name in sorted(os.listdir(PLANS_DIR)):
+        m = re.match(r"\d+[a-z]?-([a-z]+)-", name)
+        if not name.endswith(".txt") or not m or m.group(1) not in kinds:
+            continue
+        for pkg in read_plan(os.path.join(PLANS_DIR, name)):
+            want[pkg] = (kinds[m.group(1)], name)
+    return want
+
+
+def cmd_check(dev, args):
+    """Report every package, Home and key-service setting that differs from plans/; --fix --yes puts them back."""
+    states, wifi = package_states(dev), wifi_creators(dev)
+    drift, actions = [], []
+    for pkg, (want, plan) in sorted(expected_states().items()):
+        st = states.get(pkg)
+        if want == "off" and st and st["enabled"]:
+            drift.append(f"{pkg}: enabled again (plan {plan} sleeps it)")
+            if is_protected(pkg):
+                drift[-1] += ", but PROTECTED now: left alone"
+            elif pkg in wifi:
+                drift[-1] += ", but " + WIFI_REFUSAL
+            else:
+                actions.append(f"pm disable-user --user 0 {pkg}")
+        elif want == "removed" and st:
+            drift.append(f"{pkg}: installed again (plan {plan} removes it for user 0)")
+            if not is_protected(pkg) and pkg not in wifi:
+                actions.append(f"pm uninstall -k --user 0 {pkg}")
+        elif want == "absent" and st:
+            print(f"  note {pkg}: installed (plan {plan} uninstalled it); reinstalled by you? left alone")
+        elif want == "on" and st and not st["enabled"]:
+            drift.append(f"{pkg}: disabled (plan {plan} keeps it awake)")
+            actions.append(f"pm enable {pkg}")
+    if OUR_HOME.split("/")[0] in states:
+        home = sh(dev, "cmd package resolve-activity -a android.intent.action.MAIN -c android.intent.category.HOME --brief")
+        if OUR_HOME not in home:
+            drift.append(f"Home is {home.splitlines()[-1].strip() if home.strip() else '?'}, not {OUR_HOME}")
+            actions.append(f"cmd package set-home-activity --user 0 {OUR_HOME}")
+        keys = sh(dev, "settings get secure enabled_accessibility_services")
+        if OUR_KEYS not in keys:
+            drift.append("remote app-button service is off")
+            value = OUR_KEYS if keys.strip() in ("", "null") else keys.strip() + ":" + OUR_KEYS
+            actions += [f"settings put secure enabled_accessibility_services {value}", "settings put secure accessibility_enabled 1"]
+        if "allow" not in sh(dev, "appops get dev.salih.tvhome APP_AUTO_START"):
+            drift.append("TCL auto-start not allowed for the launcher (the key service can't bind)")
+            actions.append("appops set dev.salih.tvhome APP_AUTO_START allow")
+    print(f"screensaver: {sh(dev, 'settings get secure screensaver_components')}")
+    for d in drift:
+        print(f"  drift {d}")
+    if not drift:
+        print("TV matches plans/: nothing drifted")
+        return 0
+    if "--fix" not in args:
+        print(f"{len(drift)} drifted: run with --fix --yes to put them back")
+        return 1
+    if confirm_or_dry(args, "fix", actions):
+        write_snapshot(dev, "before-fix")
+        apply(dev, actions)
+    return 1
+
+
 # ---------- read-only commands ----------
 
 def cmd_find(_dev, args):
@@ -454,6 +528,7 @@ COMMANDS = {
     "uninstall": cmd_uninstall,
     "restore": cmd_restore,
     "home": cmd_home,
+    "check": cmd_check,
     "shell": lambda d, a: print(sh(d, " ".join(a))),
 }
 
@@ -463,11 +538,17 @@ def main():
         sys.exit(__doc__)
     if sys.argv[1] == "find":
         cmd_find(None, sys.argv[2:]); return
-    dev = connect()
     try:
-        COMMANDS[sys.argv[1]](dev, sys.argv[2:])
+        dev = connect()
+    except OSError as e:   # TV off, asleep, or ADB closed
+        print(f"could not reach the TV: {e}")
+        sys.exit(2)
+    try:
+        code = COMMANDS[sys.argv[1]](dev, sys.argv[2:])
     finally:
         dev.close()
+    if sys.argv[1] == "check":
+        sys.exit(code or 0)
 
 
 if __name__ == "__main__":
