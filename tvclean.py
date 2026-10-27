@@ -473,6 +473,9 @@ def cmd_check(dev, args):
             drift.append("remote app-button service is off")
             value = OUR_KEYS if keys.strip() in ("", "null") else keys.strip() + ":" + OUR_KEYS
             actions += [f"settings put secure enabled_accessibility_services {value}", "settings put secure accessibility_enabled 1"]
+        if "WRITE_SECURE_SETTINGS: granted=true" not in sh(dev, f"dumpsys package {OUR_HOME.split('/')[0]} | grep WRITE_SECURE_SETTINGS"):
+            drift.append("Home can't turn the app-button service back on by itself (WRITE_SECURE_SETTINGS)")
+            actions.append(f"pm grant {OUR_HOME.split('/')[0]} android.permission.WRITE_SECURE_SETTINGS")
         if "allow" not in sh(dev, "appops get dev.salih.tvhome APP_AUTO_START"):
             drift.append("TCL auto-start not allowed for the launcher (the key service can't bind)")
             actions.append("appops set dev.salih.tvhome APP_AUTO_START allow")
