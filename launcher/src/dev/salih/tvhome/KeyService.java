@@ -28,6 +28,7 @@ public final class KeyService extends AccessibilityService {
 
     @Override protected boolean onKeyEvent(KeyEvent e) {
         int code = e.getKeyCode();
+        if (VolumeKeys.handle(this, e)) return true;      // one step per press on this firmware (see VolumeKeys)
         if (code < 4000 || prefs == null) return false;   // TCL's app buttons are 40xx/41xx; everything else passes untouched
         String target = SettingsActivity.keyTarget(prefs, getResources(), code);
         if (target.equals("@off")) return false;
@@ -73,5 +74,6 @@ public final class KeyService extends AccessibilityService {
     }
 
     @Override public void onAccessibilityEvent(AccessibilityEvent event) { }
-    @Override public void onInterrupt() { }
+    @Override public void onInterrupt() { VolumeKeys.stop(); }
+    @Override public boolean onUnbind(Intent intent) { VolumeKeys.stop(); return super.onUnbind(intent); }
 }
