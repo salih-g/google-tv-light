@@ -5,3 +5,4 @@ com.valvesoftware.steamlink      # Steam Link
 com.exxen.android                # Exxen
 com.dsmart.blu.android           # D-Smart GO
 com.limelight                    # Moonlight
+com.phlox.tvwebbrowser           # TV Bro (replaced by dev.salih.tvbrowser)

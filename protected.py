@@ -117,7 +117,6 @@ KEEP_APPS = {
     "com.wbd.stream",
     "com.apple.atve.androidtv.appletv",
     "com.kick.mobile",
-    "com.phlox.tvwebbrowser",
 }
 
 
