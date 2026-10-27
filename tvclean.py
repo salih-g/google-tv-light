@@ -308,13 +308,12 @@ def cmd_install(dev, args):
     if confirm_or_dry(args, f"install {os.path.basename(apk)}", actions):
         write_snapshot(dev, "before-install")
         push_b64(dev, apk, remote)
-        home_in_front = home_package(dev) in resumed_package(dev)
+        if home_package(dev) in resumed_package(dev):
+            # Reinstalling the Home app kills it, and Android shows the task under it (often YouTube,
+            # which restarts) until Home is started again. Start it in the same shell call, the moment
+            # pm returns; an app that was in front stays.
+            actions[0] += " && am start -a android.intent.action.MAIN -c android.intent.category.HOME"
         apply(dev, actions)
-        if home_in_front:
-            # Reinstalling the Home app kills it, and Android then shows the task under it (often
-            # YouTube) instead of Home. Put Home back if it was on screen; an app in front stays.
-            sh(dev, "am start -a android.intent.action.MAIN -c android.intent.category.HOME")
-            print("Home was on screen: brought it back")
 
 
 def home_package(dev) -> str:
