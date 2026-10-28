@@ -89,6 +89,7 @@ public class MainActivity extends Activity {
     private ImageView weatherIcon;
     private View weatherPill;
     private int wallpaperMinutes;
+    private String wallTheme = "";
     private HorizontalScrollView dockScroll;
     private LinearLayout dock, inputsRow, pills, hint;
     private GridLayout grid;
@@ -116,7 +117,7 @@ public class MainActivity extends Activity {
         buildUi();
         setContentView(root);
         int w = getResources().getDisplayMetrics().widthPixels, h = getResources().getDisplayMetrics().heightPixels;
-        wallpaperMinutes = wallpaperMinutes();
+        wallpaperMinutes = wallpaperMinutes(); wallTheme = prefs.getString(Themes.PREF, "");
         wallpapers = new Wallpapers(this, wallBack, wallFront, handler, wallpaperMinutes, w, h);
         loadApps();
         gridOnResume = KeyService.ACTION_SHOW_APPS.equals(getIntent().getAction());
@@ -138,8 +139,8 @@ public class MainActivity extends Activity {
             f.addDataScheme("package");
             registerReceiver(packageReceiver, f); receiverRegistered = true;
         }
-        if (wallpaperMinutes != wallpaperMinutes()) {   // changed in Home settings
-            wallpapers.stop(); wallpaperMinutes = wallpaperMinutes();
+        if (wallpaperMinutes != wallpaperMinutes() || !wallTheme.equals(prefs.getString(Themes.PREF, ""))) {   // changed in Home settings
+            wallpapers.stop(); wallpaperMinutes = wallpaperMinutes(); wallTheme = prefs.getString(Themes.PREF, "");
             int w = getResources().getDisplayMetrics().widthPixels, h = getResources().getDisplayMetrics().heightPixels;
             wallpapers = new Wallpapers(this, wallBack, wallFront, handler, wallpaperMinutes, w, h);
             wallpapers.start();
@@ -710,6 +711,8 @@ public class MainActivity extends Activity {
         prevFocus = null; // programmatic move, no sound
         View f = lastDockFocus != null ? lastDockFocus : dock.getChildAt(0);
         if (f != null) f.requestFocus();
+        // a tile that already had focus fires no focus change: place the glass and glow once laid out
+        dock.post(() -> dockFocus(getCurrentFocus()));
     }
 
     private void showGrid() {

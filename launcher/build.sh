@@ -14,6 +14,7 @@ B=build
 rm -rf "$B" && mkdir -p "$B/gen" "$B/classes" "$B/dex" "$B/assets/wallpapers"
 # Only the <scene>-<slot>.jpg frames ship; CREDITS.md stays in the repo.
 cp wallpapers/*.jpg "$B/assets/wallpapers/"
+cp themes/themes.json "$B/assets/"   # photo-less ambient themes (Themes.java)
 "$BT/aapt2" compile --dir res -o "$B/res.zip"
 "$BT/aapt2" link -o "$B/base.apk" -I "$JAR" --manifest AndroidManifest.xml --java "$B/gen" \
   -A "$B/assets" --min-sdk-version 30 --target-sdk-version 30 "$B/res.zip"

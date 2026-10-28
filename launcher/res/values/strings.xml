@@ -98,4 +98,6 @@
     <string name="ag_wrong_login">Wrong user or password (Home settings)</string>
     <string name="move">Move</string>
     <string name="moving">Moving %1$s: arrows to move, OK to finish</string>
+    <string name="wallpaper">Wallpaper</string>
+    <string name="photos">Photos</string>
 </resources>

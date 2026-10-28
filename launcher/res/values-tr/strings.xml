@@ -98,4 +98,6 @@
     <string name="ag_wrong_login">Kullanıcı adı ya da şifre yanlış (Home ayarları)</string>
     <string name="move">Taşı</string>
     <string name="moving">%1$s taşınıyor: oklarla taşı, bitirmek için OK</string>
+    <string name="wallpaper">Duvar kâğıdı</string>
+    <string name="photos">Fotoğraflar</string>
 </resources>

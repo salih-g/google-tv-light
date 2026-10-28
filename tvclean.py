@@ -30,6 +30,7 @@ Usage
   tvclean.py check [--fix] [--yes]       after a firmware update: compare the TV with plans/ (and Home, the remote
                                          key service); --fix --yes re-applies what drifted. Exit 0 ok, 1 drift, 2 no TV
   tvclean.py screenshot <out.png>        save what the TV shows (read-only)
+  tvclean.py themes <themes.json> [--yes]  send Home's photo-less themes (no rebuild; pick one in Home settings)
   tvclean.py shell '<cmd>'               one read-only shell command
 
 TV address: TV_HOST env or .tv_host file next to this script.
@@ -495,6 +496,30 @@ def cmd_check(dev, args):
 
 # ---------- read-only commands ----------
 
+THEMES_REMOTE = "/sdcard/Android/data/dev.salih.tvhome/files/themes.json"
+
+
+def cmd_themes(dev, args):
+    """Check a themes file (launcher/themes/themes.json is the format) and put it where Home reads it."""
+    path = args[0]
+    try:
+        data = json.load(open(path))
+        for t in data["themes"]:
+            assert isinstance(t["name"], str) and t["name"], "every theme needs a name"
+            slots = [k for k in ("sabah", "gunduz", "aksam", "gece") if k in t]
+            assert slots, f"{t['name']}: no sabah/gunduz/aksam/gece colours"
+            for k in slots:
+                assert len(t[k]) >= 2 and all(re.fullmatch(r"#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?", c) for c in t[k]), \
+                    f"{t['name']}.{k}: needs 2+ colours like #1B2A4A"
+    except (OSError, ValueError, KeyError, TypeError, AssertionError) as e:
+        sys.exit(f"{path}: {e}")
+    names = ", ".join(t["name"] for t in data["themes"])
+    if confirm_or_dry(args, f"send themes ({names})", [f"write {THEMES_REMOTE}"]):
+        sh(dev, f"mkdir -p {os.path.dirname(THEMES_REMOTE)}")
+        push_b64(dev, path, THEMES_REMOTE)
+        print("Home picks them up the next time it shows; choose one in Home settings > Wallpaper")
+
+
 def cmd_screenshot(dev, args):
     """screencap on the TV, read back in base64 chunks (adb-shell's sync pull times out on this TV)."""
     out = args[0] if args else "tv.png"
@@ -566,6 +591,7 @@ COMMANDS = {
     "home": cmd_home,
     "check": cmd_check,
     "screenshot": cmd_screenshot,
+    "themes": cmd_themes,
     "shell": lambda d, a: print(sh(d, " ".join(a))),
 }
 

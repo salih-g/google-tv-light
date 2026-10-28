@@ -85,6 +85,15 @@ public final class SettingsActivity extends Activity {
             prefs.edit().putString("temp_unit", Sky.fahrenheit(this) ? "C" : "F").remove("wx_at").apply();
             Sky.refresh(this, true, this::build); build();
         });
+        String theme = prefs.getString(Themes.PREF, "");
+        row(getString(R.string.wallpaper), theme.isEmpty() ? getString(R.string.photos) : theme, () -> {
+            // Photos → each theme → Photos (the list includes themes pushed to the TV)
+            List<String> names = new ArrayList<>();
+            names.add("");
+            for (Themes.Theme t : Themes.all(this)) names.add(t.name);
+            String next = names.get((names.indexOf(theme) + 1) % names.size());
+            prefs.edit().putString(Themes.PREF, next).apply(); build();
+        });
         int minutes = wallpaperMinutes();
         row(getString(R.string.wallpaper_every), getString(R.string.minutes, minutes), () -> {
             int next = minutes == 15 ? 30 : minutes == 30 ? 60 : 15;

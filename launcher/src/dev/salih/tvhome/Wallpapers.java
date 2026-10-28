@@ -42,10 +42,14 @@ final class Wallpapers {
     private final java.util.Set<String> variants = new java.util.HashSet<>();
     /** Current weather name for variant frames, or null/"" for plain frames. Only the screensaver sets it. */
     private java.util.function.Supplier<String> weather;
+    /** A photo-less ambient theme chosen in Home settings (Themes), or null for the photos. */
+    private final Themes.Theme theme;
+    private long themeStep = System.currentTimeMillis() / 60_000L;
 
     Wallpapers(Context ctx, ImageView back, ImageView front, Handler handler, int minutes, int w, int h) {
         this.ctx = ctx; this.back = back; this.front = front; this.handler = handler;
         this.intervalMs = Math.max(1, minutes) * 60_000L; this.width = w; this.height = h;
+        theme = Themes.find(ctx, ctx.getSharedPreferences(Sky.PREFS, Context.MODE_PRIVATE).getString(Themes.PREF, ""));
         scan();
     }
 
@@ -89,6 +93,12 @@ final class Wallpapers {
         @Override public void run() {
             String slot = slotFor(Calendar.getInstance());
             wantedSlot = slot;
+            if (theme != null) {   // the same palette in a new arrangement each interval, the slot's palette at sunset
+                present(new BitmapDrawable(ctx.getResources(), Themes.render(theme, slot, themeStep++, width / 2, height / 2)), currentScene != null);
+                currentScene = "theme:" + theme.name; currentSlot = slot; changedAt = System.currentTimeMillis();
+                handler.postDelayed(this, intervalMs);
+                return;
+            }
             // Slot changed: keep the scene if it has the new frame, so the light changes in place.
             if (!slot.equals(currentSlot) && currentScene != null && scenes.get(currentScene).contains(slot)) {
                 show(currentScene, slot, true);
@@ -121,7 +131,7 @@ final class Wallpapers {
 
     /** The weather changed: show the current scene's matching frame now (or the plain one again), with a crossfade. */
     void weatherChanged() {
-        if (currentScene == null) return;
+        if (currentScene == null || theme != null) return;
         String w = wantedWeather();
         if (w.equals(currentWeather)) return;
         String slot = wantedSlot != null ? wantedSlot : currentSlot;
@@ -176,7 +186,11 @@ final class Wallpapers {
         if (scene.equals(currentScene) && frame.equals(currentSlot) && shownWeather.equals(currentWeather)) return;
         Bitmap bmp = decode("wallpapers/" + file + ".jpg");
         if (bmp == null) return;
-        BitmapDrawable d = new BitmapDrawable(ctx.getResources(), bmp);
+        present(new BitmapDrawable(ctx.getResources(), bmp), animate);
+        currentScene = scene; currentSlot = frame; currentWeather = shownWeather; changedAt = System.currentTimeMillis();
+    }
+
+    private void present(BitmapDrawable d, boolean animate) {
         // z-order never changes: `back` sits at the bottom, `front` right above it, the UI above both.
         // A new frame fades in on `front`, then moves down to `back` so `front` is free for the next one.
         if (animate && back.getDrawable() != null) {
@@ -195,7 +209,6 @@ final class Wallpapers {
             back.setImageDrawable(d); back.setAlpha(1f); back.setVisibility(View.VISIBLE);
             front.setImageDrawable(null); front.setVisibility(View.INVISIBLE);
         }
-        currentScene = scene; currentSlot = frame; currentWeather = shownWeather; changedAt = System.currentTimeMillis();
     }
 
     /** A scene missing the exact slot shows its nearest earlier frame; night falls back to evening, then day. */
