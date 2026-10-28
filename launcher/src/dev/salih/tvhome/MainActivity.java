@@ -311,6 +311,9 @@ public class MainActivity extends Activity {
         guardPill = pill(R.drawable.ic_shield, "AdGuard");
         guardPill.setOnClickListener(this::showGuard);
         guardIcon = (ImageView) ((LinearLayout) guardPill).getChildAt(0);
+        guardDot.setShape(GradientDrawable.OVAL); guardDot.setColor(0xFF34C759);
+        guardDot.setBounds(dp(11), 0, dp(18), dp(7)); guardDot.setAlpha(0);
+        guardIcon.getOverlay().add(guardDot);
         View.OnFocusChangeListener guardBase = guardPill.getOnFocusChangeListener();
         guardPill.setOnFocusChangeListener((v, f) -> { guardBase.onFocusChange(v, f); tintGuard(); });
         guardPill.setVisibility(Guard.configured(this) ? View.VISIBLE : View.GONE);
@@ -1035,8 +1038,10 @@ public class MainActivity extends Activity {
         Guard.status(this, show);
     }
 
-    // The pill's shield: green while protection is on, grey while it is off or paused, plain until AdGuard answers.
+    // The pill's shield: a small green dot while protection is on (like a camera-in-use light), a grey shield while
+    // it is off or paused, a plain shield until AdGuard answers.
     private ImageView guardIcon;
+    private final GradientDrawable guardDot = new GradientDrawable();
     private Boolean guardOn;
     private final Runnable guardRefresh = this::refreshGuard;
 
@@ -1054,8 +1059,12 @@ public class MainActivity extends Activity {
 
     private void tintGuard() {
         if (guardIcon == null) return;
-        int c = guardOn == null ? (guardPill.isFocused() ? 0xFF111111 : 0xFFFFFFFF) : guardOn ? 0xFF34C759 : 0xFF8E8E93;
+        boolean focused = guardPill.isFocused();
+        int c = Boolean.FALSE.equals(guardOn) ? 0xFF8E8E93 : focused ? 0xFF111111 : 0xFFFFFFFF;
         guardIcon.setImageTintList(ColorStateList.valueOf(c));
+        guardDot.setStroke(Math.max(1, dp(1.5f)), focused ? 0xFFF2F2F2 : 0xFF1C2130);   // a ring in the pill's colour
+        guardDot.setAlpha(Boolean.TRUE.equals(guardOn) ? 255 : 0);
+        guardIcon.invalidate();
     }
 
     private void stat(LinearLayout row, String label, String value) {
