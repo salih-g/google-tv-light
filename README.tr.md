@@ -116,7 +116,7 @@ Geri al: `tvclean.py wake plans/08-sleep-stock-home.txt --yes && tvclean.py home
 
 TV'de: D-pad gezinir, OK açar, **Aşağı** tüm uygulamalar ızgarasını ve girişler satırını açar,
 **Geri** döner, **Menü** girişler menüsünü açar, bir kutuda **OK'ye uzun basmak** dock'u düzenler
-ya da uygulamayı dock'a ekler. Kumandanın diğer her tuşu (ses, sessiz, mikrofon, Kaynak,
+ya da uygulamayı dock'a ekler; ızgarada **Taşı** da çıkar (oklar uygulamayı taşır, OK bırakır). Kumandanın diğer her tuşu (ses, sessiz, mikrofon, Kaynak,
 Ayarlar, kanal) sisteme bırakılır ve çalışmaya devam eder.
 
 **Kumanda uygulama tuşları.** Google TV sürümlerinde TCL'nin tuş işleyicisi Netflix, YouTube ve
@@ -134,10 +134,18 @@ anahtarı), o olmadan sistem servisi bağlamayı reddeder:
 
 Kapatmak: `tvclean.py shell 'settings put secure enabled_accessibility_services "" && settings put secure accessibility_enabled 0'`.
 
+Sonradan bir şey servisi kapatırsa (Ayarlar, firmware güncellemesi), ana ekran bir sonraki
+açılışında onu geri açar: Ana ekran ayarlarından ana ekranı değiştirmek uygulamaya bir kez
+`WRITE_SECURE_SETTINGS` verir, böylece sadece o ayarı yazar; `tvclean.py check --fix` de verir.
+Servis açıkken bu TV her ses tuşunu iki kez uyguluyordu (bir basış = iki adım); servis artık ses
+tuşlarını alıp basılı tutulanı kendisi tekrarlıyor (fikir [cleanyourtv](https://github.com/Gathin23/cleanyourtv)'den, MIT).
+
 **TV'de ana ekran ayarları.** *Ana ekran ayarları* tüm uygulamalar ızgarasında (ya da Ayarlar
 hapına uzun bas). Ana ekranı (bu ya da Google TV) ve ekran koruyucuyu (bu ya da Google'ınki)
-değiştirir, kumandanın her uygulama tuşunun neyi açacağını, hava durumu şehrini ve birimini,
-duvar kağıdının ne sıklıkla değişeceğini seçer. Ana ekran ve ekran koruyucu geçişleri, TV'nin kendi
+değiştirir; kumandanın her uygulama tuşunun neyi açacağını, dock sırasını (senin düzenin ya da
+Android'in kullanım geçmişine göre en çok kullanılan önce), hava durumu şehrini ve birimini, duvar
+kağıdını (fotoğraflar ya da fotoğrafsız tema) ve ne sıklıkla değişeceğini, AdGuard Home adresini ve
+girişini seçer. Ana ekran ve ekran koruyucu geçişleri, TV'nin kendi
 ADB'si üzerinden TV'nin içinden sabit komutlar çalıştırır (`Adb.java`, Free My TV'den uyarlandı):
 ilk seferde TV *USB hata ayıklamaya izin verilsin mi?* diye sorar; *Her zaman izin ver*i işaretle.
 
@@ -145,7 +153,25 @@ ilk seferde TV *USB hata ayıklamaya izin verilsin mi?* diye sorar; *Her zaman i
 [Open-Meteo](https://open-meteo.com/)'dan gösterir (ücretsiz, anahtarsız); duvar kağıdının sabah,
 gündüz, akşam ve gecesi sabit saatler yerine o şehrin gerçek gün doğumu ve batımını izler. Şehir
 TV'nin saat diliminden gelir; `GMT+03:00` gibi bir dilim şehir adı içermez, bu yüzden hap Ana ekran
-ayarlarında bir şehir seçilene kadar *Şehir seç* der.
+ayarlarında bir şehir seçilene kadar *Şehir seç* der. Hapta OK bir kart açar: hissedilen, nem,
+rüzgâr, ABD hava kalitesi endeksi, bugün ve sonraki üç gün.
+
+**Girişler.** Girişler hapı ve Menü takılı olanları listeler, cihazlar en üstte: TV'nin HDMI-CEC ile
+tanıdığı konsol ya da oynatıcı açıkken yeşil, beklemedeyken kırmızı nokta alır (TV'nin CEC servisinden,
+kendi ADB'si üzerinden, salt okunur; Android bunu uygulamalara vermiyor ve bu TV boş portla uyuyan
+cihazı aynı bildiriyor). Boş portlar *Diğer girişler* altında katlanır.
+
+**Dock.** Odaklanan uygulamaya bir cam levha kayar ve alttan uygulamanın kendi renginde yumuşak bir
+ışık yükselir; ikisi de her harekette bir kez çizilir, boştayken hiçbir şey animasyon yapmaz.
+
+**Fotoğrafsız temalar.** Ana ekran ayarları > Duvar kâğıdı, fotoğraflardan günün saatine göre paleti
+olan gradyan temalara geçer; her duvar kâğıdı değişiminde aynı palet yeni bir düzenle çizilir.
+[`launcher/themes/themes.json`](launcher/themes/themes.json) dördüyle gelir; aynı biçimde kendininkini
+yaz ve yeniden derlemeden gönder: `tvclean.py themes temalarim.json --yes`.
+
+**AdGuard Home.** Adresi ve girişi Ana ekran ayarlarında girilince bir kalkan hapı koruma durumunu
+ve son 24 saati (sorgu, engellenen, ortalama süre) gösterir, korumayı 5 dakika duraklatıp geri
+açabilir. Şifre uygulamanın özel deposunda kalır.
 
 **Ekran koruyucu.** Duvar kağıtları tam ekran, büyük saat, tarih ve hava durumu. Sadece beş
 dakikada bir sahne geçişi ve dakika güncellemesi için kare çizer, gerisinde boşta durur; Google'ın
@@ -177,7 +203,10 @@ içeriği). [Perflyst Smart-TV listesi](https://perflyst.github.io/PiHoleBlockli
 | `sleep <plan>` / `wake <plan>` | paketleri kullanıcı için uyut / uyandır |
 | `uninstall <plan>` | Play Store uygulamalarını kaldır (sistem paketlerini reddeder) |
 | `remove <plan>` / `readd <plan>` | sistem paketini yalnızca kullanıcı için kaldır / geri getir |
-| `install <apk> [--grant=pkg:izin]` | APK gönder ve kur |
+| `install <apk> [--grant=pkg:izin]` | APK gönder ve kur (ana ekranı yeniden kurduysa geri getirir) |
+| `check [--fix]` | paketleri, ana ekranı ve tuş servisini `plans/` ile karşılaştır; `--fix` geri koyar (çıkış 1 = sapma) |
+| `themes <dosya.json>` | ana ekranın fotoğrafsız temalarını gönder |
+| `screenshot <çıktı.png>` | TV'nin gösterdiği |
 | `home check` / `home set <bileşen>` / `home reset` | Home tuşu |
 | `restore <snapshot.json>` | o snapshot'a dön |
 | `reboot` | paket yöneticisi yazdıktan sonra yeniden başlat |
@@ -196,5 +225,7 @@ Google TV'de çalışır. Samsung (Tizen), LG (webOS) ve Fire TV için değildir
 Kod MIT ([LICENSE](LICENSE)). Duvar kağıtları ve ikonların kendi lisansları
 [`launcher/wallpapers/CREDITS.md`](launcher/wallpapers/CREDITS.md) dosyasındadır.
 [mihirgupta0900/tv-home](https://github.com/mihirgupta0900/tv-home) projesinden ilham alınmıştır. TV içi ADB
-istemcisi ve çökme koruması fikri [Free My TV](https://github.com/simbasjungles/free-my-tv)'den (MIT). Hava
+istemcisi ve çökme koruması fikri [Free My TV](https://github.com/simbasjungles/free-my-tv)'den (MIT). Ses
+düzeltmesi, CEC'li girişler menüsü, sapma kontrolü ve birkaç ana ekran fikri
+[cleanyourtv](https://github.com/Gathin23/cleanyourtv)'den (MIT). Hava
 verisi [Open-Meteo.com](https://open-meteo.com/) (CC BY 4.0). Hava ikonları: [Material Symbols](https://fonts.google.com/icons) (Apache 2.0).

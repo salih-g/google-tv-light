@@ -117,7 +117,7 @@ Undo: `tvclean.py wake plans/08-sleep-stock-home.txt --yes && tvclean.py home re
 
 On the TV: D-pad moves, OK opens, **Down** opens the all-apps grid with an inputs row, **Back**
 returns, **Menu** opens the inputs menu, **long-press OK** on a tile rearranges the dock or adds
-an app to it. Every other remote key (volume, mute, mic, Source, Settings, channel) is left to
+an app to it, and in the grid offers **Move** (the arrows carry the app, OK drops it). Every other remote key (volume, mute, mic, Source, Settings, channel) is left to
 the system and keeps working.
 
 **Remote app buttons.** On Google TV builds, TCL's key handler sends the Netflix, YouTube and
@@ -135,10 +135,17 @@ it the system refuses to bind the service:
 
 Off: `tvclean.py shell 'settings put secure enabled_accessibility_services "" && settings put secure accessibility_enabled 0'`.
 
+If something turns the service off later (Settings, a firmware update), Home turns it back on the
+next time it shows: switching Home in Home settings grants it `WRITE_SECURE_SETTINGS` once, so it
+only writes that setting; `tvclean.py check --fix` grants it too. With the service on, this TV
+applied every volume key twice (one press = two steps); the service now takes the volume keys and
+repeats a held one itself (idea from [cleanyourtv](https://github.com/Gathin23/cleanyourtv), MIT).
+
 **Home settings on the TV.** *Home settings* sits in the all-apps grid (or long-press the Settings
 pill). It switches the Home screen (this one or Google TV's) and the screensaver (this one or
-Google's), picks what each remote app button opens, sets the weather city and unit, and how often
-the wallpaper changes. The Home and screensaver switches run fixed commands through the TV's own
+Google's), picks what each remote app button opens, the dock order (as arranged, or most used
+first from Android's usage history), the weather city and unit, the wallpaper (photos or a
+photo-less theme) and how often it changes, and the AdGuard Home address and login. The Home and screensaver switches run fixed commands through the TV's own
 ADB from inside the TV (`Adb.java`, adapted from Free My TV): the first time, the TV asks *Allow USB
 debugging?*; tick *Always allow*.
 
@@ -146,7 +153,26 @@ debugging?*; tick *Always allow*.
 [Open-Meteo](https://open-meteo.com/) (free, no key), and the wallpaper's morning, day, evening
 and night follow that city's real sunrise and sunset instead of fixed hours. The city comes from
 the TV's time zone; a zone like `GMT+03:00` names no city, so the pill says *Set city* until one is
-picked in Home settings.
+picked in Home settings. OK on the pill opens a card: feels-like, humidity, wind, US air quality
+and today plus the next three days.
+
+**Inputs.** The Inputs pill and Menu open a drop-down of what is plugged in, devices first: a
+console or player the TV knows over HDMI-CEC shows a green dot when on and a red one when in
+standby (read from the TV's CEC service through its own ADB, read-only; Android doesn't give apps
+this, and this TV reports an empty port and a sleeping device the same way). Empty ports fold into
+*Other inputs*.
+
+**Dock.** A glass slab slides to the focused app and a soft light in the app's own colour rises
+from below; both are drawn once per move, nothing animates while idle.
+
+**Photo-less themes.** Home settings > Wallpaper switches from the photos to gradient themes with a
+palette per time of day; each wallpaper change draws the same palette in a new arrangement.
+[`launcher/themes/themes.json`](launcher/themes/themes.json) ships four; write your own in the same
+shape and send it without rebuilding: `tvclean.py themes my-themes.json --yes`.
+
+**AdGuard Home.** Once its address and login are set in Home settings, a shield pill shows
+protection state and the last 24 hours (queries, blocked, average time) and can pause protection
+for 5 minutes or turn it back on. The password stays in the app's private storage.
 
 **Screensaver.** The wallpapers full screen with a large clock, the date and the weather. It draws
 a frame only for a scene change every five minutes and the minute tick, then sits idle; Google's
@@ -176,7 +202,10 @@ The [Perflyst Smart-TV list](https://perflyst.github.io/PiHoleBlocklist/SmartTV.
 | `sleep <plan>` / `wake <plan>` | disable / re-enable packages for user 0 |
 | `uninstall <plan>` | remove Play Store apps (refuses system packages) |
 | `remove <plan>` / `readd <plan>` | uninstall a system package for user 0 only / bring it back |
-| `install <apk> [--grant=pkg:perm]` | push and install an APK |
+| `install <apk> [--grant=pkg:perm]` | push and install an APK (brings Home back if it reinstalled Home) |
+| `check [--fix]` | compare packages, Home and the key service with `plans/`; `--fix` puts them back (exit 1 = drift) |
+| `themes <file.json>` | send Home's photo-less themes |
+| `screenshot <out.png>` | what the TV shows |
 | `home check` / `home set <component>` / `home reset` | the Home key |
 | `restore <snapshot.json>` | back to that snapshot |
 | `reboot` | reboot after the package manager has flushed |
@@ -195,5 +224,7 @@ USB debugging. Not for Samsung (Tizen), LG (webOS) or Fire TV.
 Code is MIT ([LICENSE](LICENSE)). Wallpapers and icons have their own licenses, see
 [`launcher/wallpapers/CREDITS.md`](launcher/wallpapers/CREDITS.md). Inspired by
 [mihirgupta0900/tv-home](https://github.com/mihirgupta0900/tv-home). The in-TV ADB client and the crash
-watchdog idea come from [Free My TV](https://github.com/simbasjungles/free-my-tv) (MIT). Weather data by
+watchdog idea come from [Free My TV](https://github.com/simbasjungles/free-my-tv) (MIT). The volume fix,
+the CEC inputs menu, the drift check and several Home ideas come from
+[cleanyourtv](https://github.com/Gathin23/cleanyourtv) (MIT). Weather data by
 [Open-Meteo.com](https://open-meteo.com/) (CC BY 4.0). Weather icons: [Material Symbols](https://fonts.google.com/icons) (Apache 2.0).
