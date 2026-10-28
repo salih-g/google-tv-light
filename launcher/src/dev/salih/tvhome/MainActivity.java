@@ -148,6 +148,7 @@ public class MainActivity extends Activity {
         updateWeather();
         Sky.refresh(this, false, this::updateWeather);
         guardPill.setVisibility(Guard.configured(this) ? View.VISIBLE : View.GONE);
+        refreshGuard();
         loadApps(); // picks up installs that happened while another app was in front
         if (prefs.getBoolean(Usage.PREF, false)) {
             Context app = getApplicationContext();
@@ -164,6 +165,7 @@ public class MainActivity extends Activity {
         stopMoving();
         wallpapers.stop();
         handler.removeCallbacks(minuteTick);
+        handler.removeCallbacks(guardRefresh);   // onResume asks again
         if (receiverRegistered) { unregisterReceiver(packageReceiver); receiverRegistered = false; }
         dismissCards();
     }
@@ -308,6 +310,9 @@ public class MainActivity extends Activity {
         weatherPill = weatherPill();
         guardPill = pill(R.drawable.ic_shield, "AdGuard");
         guardPill.setOnClickListener(this::showGuard);
+        guardIcon = (ImageView) ((LinearLayout) guardPill).getChildAt(0);
+        View.OnFocusChangeListener guardBase = guardPill.getOnFocusChangeListener();
+        guardPill.setOnFocusChangeListener((v, f) -> { guardBase.onFocusChange(v, f); tintGuard(); });
         guardPill.setVisibility(Guard.configured(this) ? View.VISIBLE : View.GONE);
         for (View p : new View[]{weatherPill, guardPill, inputsPill, wifiPill, settingsPill}) {
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(34));
@@ -1010,6 +1015,7 @@ public class MainActivity extends Activity {
         Guard.Result<Guard.Status> show = new Guard.Result<Guard.Status>() {
             @Override public void done(Guard.Status s, String err) {
                 if (!card.isShowing() || card.getContentView() != box) return;
+                guardState(s);
                 if (err != null) { stateText.setText(err); ((GradientDrawable) stateDot.getBackground()).setColor(0xFFFF453A); return; }
                 boolean paused = !s.on && s.pausedMs > 0;
                 ((GradientDrawable) stateDot.getBackground()).setColor(s.on ? 0xFF34C759 : paused ? 0xFFFF9F0A : 0xFFFF453A);
@@ -1027,6 +1033,29 @@ public class MainActivity extends Activity {
             }
         };
         Guard.status(this, show);
+    }
+
+    // The pill's shield: green while protection is on, grey while it is off or paused, plain until AdGuard answers.
+    private ImageView guardIcon;
+    private Boolean guardOn;
+    private final Runnable guardRefresh = this::refreshGuard;
+
+    private void refreshGuard() {
+        if (!Guard.configured(this)) return;
+        Guard.status(this, (s, err) -> guardState(s));
+    }
+
+    private void guardState(Guard.Status s) {
+        guardOn = s == null ? null : s.on;
+        tintGuard();
+        handler.removeCallbacks(guardRefresh);
+        if (s != null && !s.on && s.pausedMs > 0) handler.postDelayed(guardRefresh, s.pausedMs + 2000);   // back on by itself
+    }
+
+    private void tintGuard() {
+        if (guardIcon == null) return;
+        int c = guardOn == null ? (guardPill.isFocused() ? 0xFF111111 : 0xFFFFFFFF) : guardOn ? 0xFF34C759 : 0xFF8E8E93;
+        guardIcon.setImageTintList(ColorStateList.valueOf(c));
     }
 
     private void stat(LinearLayout row, String label, String value) {
