@@ -1043,8 +1043,11 @@ public class MainActivity extends Activity {
         Integer t = Sky.temperature(this);
         if (t == null) { launch(new Intent(this, SettingsActivity.class)); return; }   // no city yet: pick one
         org.json.JSONObject more = Sky.more(this);
-        if (more == null) Sky.refresh(this, true, this::updateWeather);   // saved before the card existed
         LinearLayout box = showCard(anchor, 380);
+        if (more == null) Sky.refresh(this, true, () -> {   // saved before the card existed: fetch, then redraw it
+            updateWeather();
+            if (card != null && card.isShowing() && card.getContentView() == box && Sky.more(this) != null) { card.dismiss(); showWeather(anchor); }
+        });
         int code = Sky.code(this);
         LinearLayout now = new LinearLayout(this); now.setGravity(Gravity.CENTER_VERTICAL);
         ImageView big = new ImageView(this); big.setImageResource(Sky.icon(code, Sky.isDay(this))); big.setImageTintList(ColorStateList.valueOf(0xFFFFFFFF));
