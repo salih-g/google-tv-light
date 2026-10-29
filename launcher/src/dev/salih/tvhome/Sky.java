@@ -73,6 +73,33 @@ final class Sky {
 
     /** Time-of-day slot from the real sunrise and sunset, or null when there is no data for today. */
     static String slot(Context c, long now) {
+        long[] sun = sun(c, now);
+        if (sun == null) return null;
+        long rise = sun[0], set = sun[1];
+        long min = 60_000L;
+        if (now >= rise - 30 * min && now < rise + 150 * min) return "sabah";
+        if (now >= rise + 150 * min && now < set - 75 * min) return "gunduz";
+        if (now >= set - 75 * min && now < set + 45 * min) return "aksam";
+        return "gece";
+    }
+
+    /**
+     * The living sky's five parts of the day from the real sunrise and sunset: sabah (dawn), gunduz (day), ikindi
+     * (golden afternoon), aksam (sunset), gece (night); null when there is no data for today.
+     */
+    static String phase(Context c, long now) {
+        long[] sun = sun(c, now);
+        if (sun == null) return null;
+        long rise = sun[0], set = sun[1], min = 60_000L;
+        if (now >= rise - 45 * min && now < rise + 90 * min) return "sabah";
+        if (now >= rise + 90 * min && now < set - 180 * min) return "gunduz";
+        if (now >= set - 180 * min && now < set - 50 * min) return "ikindi";
+        if (now >= set - 50 * min && now < set + 40 * min) return "aksam";
+        return "gece";
+    }
+
+    /** Sunrise and sunset (ms) of the day nearest `now`, or null when the cached forecast has none near it. */
+    private static long[] sun(Context c, long now) {
         String rises = prefs(c).getString("sun_rise", ""), sets = prefs(c).getString("sun_set", "");
         if (rises.isEmpty() || sets.isEmpty()) return null;
         String[] r = rises.split(","), s = sets.split(",");
@@ -82,12 +109,7 @@ final class Sky {
             long d = Math.abs(now - (ri + si) / 2);
             if (d < best) { best = d; rise = ri; set = si; }
         }
-        if (best > 20 * 3600_000L) return null;   // stale: no day near now
-        long min = 60_000L;
-        if (now >= rise - 30 * min && now < rise + 150 * min) return "sabah";
-        if (now >= rise + 150 * min && now < set - 75 * min) return "gunduz";
-        if (now >= set - 75 * min && now < set + 45 * min) return "aksam";
-        return "gece";
+        return best > 20 * 3600_000L ? null : new long[]{rise, set};   // stale: no day near now
     }
 
     /** Weather name used by wallpaper variants ("" for clear or partly cloudy skies, or when unknown). */

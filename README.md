@@ -170,6 +170,13 @@ palette per time of day; each wallpaper change draws the same palette in a new a
 [`launcher/themes/themes.json`](launcher/themes/themes.json) ships four; write your own in the same
 shape and send it without rebuilding: `tvclean.py themes my-themes.json --yes`.
 
+**Living wallpapers.** Pixel-art scenes that move: *Sky* (dawn, day, golden afternoon, sunset and a
+moonlit night, following the real sun; a change of light blends over a minute), *Koi pond*,
+*Fireflies* and *Jellyfish*. A 128x72 frame is drawn ten times a second and scaled up, so each frame
+is one tiny texture; the scene keeps still for 1.5 s after any remote key, so navigation stays
+smooth, and stops whenever Home and the screensaver are not on screen. Pick one in Home settings >
+Wallpaper.
+
 **AdGuard Home.** Once its address and login are set in Home settings, a shield pill shows
 protection state and the last 24 hours (queries, blocked, average time) and can pause protection
 for 5 minutes or turn it back on. The password stays in the app's private storage.

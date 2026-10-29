@@ -44,12 +44,16 @@ final class Wallpapers {
     private java.util.function.Supplier<String> weather;
     /** A photo-less ambient theme chosen in Home settings (Themes), or null for the photos. */
     private final Themes.Theme theme;
+    /** A living pixel-art wallpaper chosen in Home settings (Live), or null. */
+    private final Live live;
     private long themeStep = System.currentTimeMillis() / 60_000L;
 
     Wallpapers(Context ctx, ImageView back, ImageView front, Handler handler, int minutes, int w, int h) {
         this.ctx = ctx; this.back = back; this.front = front; this.handler = handler;
         this.intervalMs = Math.max(1, minutes) * 60_000L; this.width = w; this.height = h;
-        theme = Themes.find(ctx, ctx.getSharedPreferences(Sky.PREFS, Context.MODE_PRIVATE).getString(Themes.PREF, ""));
+        String pick = ctx.getSharedPreferences(Sky.PREFS, Context.MODE_PRIVATE).getString(Themes.PREF, "");
+        live = Live.create(pick);
+        theme = live == null ? Themes.find(ctx, pick) : null;
         scan();
     }
 
@@ -115,13 +119,25 @@ final class Wallpapers {
      */
     void start() {
         handler.removeCallbacks(tick);
+        if (live != null) {
+            if (back.getDrawable() != live) {
+                back.setImageDrawable(live); back.setAlpha(1f); back.setVisibility(View.VISIBLE);
+                front.setImageDrawable(null); front.setVisibility(View.INVISIBLE);
+            }
+            live.start();
+            return;
+        }
         if (currentScene == null || !slotFor(Calendar.getInstance()).equals(wantedSlot)) { handler.post(tick); return; }
         handler.postDelayed(tick, Math.max(0, changedAt + intervalMs - System.currentTimeMillis()));
     }
-    void stop() { handler.removeCallbacks(tick); }
+    void stop() { handler.removeCallbacks(tick); if (live != null) live.stop(); }
+
+    /** A remote key was pressed: a living wallpaper keeps still for a moment. */
+    void hold() { if (live != null) live.hold(); }
 
     /** Called when the clock minute changes; switches frame exactly at a slot boundary. */
     void onMinute() {
+        if (live != null) return;
         String slot = slotFor(Calendar.getInstance());
         if (currentScene != null && !slot.equals(wantedSlot)) { handler.removeCallbacks(tick); handler.post(tick); }
     }
@@ -131,7 +147,7 @@ final class Wallpapers {
 
     /** The weather changed: show the current scene's matching frame now (or the plain one again), with a crossfade. */
     void weatherChanged() {
-        if (currentScene == null || theme != null) return;
+        if (currentScene == null || theme != null || live != null) return;
         String w = wantedWeather();
         if (w.equals(currentWeather)) return;
         String slot = wantedSlot != null ? wantedSlot : currentSlot;

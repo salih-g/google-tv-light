@@ -86,6 +86,7 @@ public final class Dream extends DreamService {
 
         int w = getResources().getDisplayMetrics().widthPixels, h = getResources().getDisplayMetrics().heightPixels;
         Wallpapers.sun = t -> Sky.slot(this, t);
+        Live.phase = t -> Sky.phase(this, t);
         wallpapers = new Wallpapers(this, back, front, handler, SCENE_MINUTES, w, h);
         wallpapers.setWeather(() -> Sky.weatherName(this));   // rainy, snowy, foggy or cloudy frames when they ship
     }

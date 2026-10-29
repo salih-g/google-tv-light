@@ -86,11 +86,13 @@ public final class SettingsActivity extends Activity {
             Sky.refresh(this, true, this::build); build();
         });
         String theme = prefs.getString(Themes.PREF, "");
-        row(getString(R.string.wallpaper), theme.isEmpty() ? getString(R.string.photos) : theme, () -> {
-            // Photos → each theme → Photos (the list includes themes pushed to the TV)
+        row(getString(R.string.wallpaper), theme.isEmpty() ? getString(R.string.photos)
+                : theme.startsWith(Live.PREFIX) ? Live.label(theme) : theme, () -> {
+            // Photos → each theme (with any pushed to the TV) → each living one → Photos
             List<String> names = new ArrayList<>();
             names.add("");
             for (Themes.Theme t : Themes.all(this)) names.add(t.name);
+            for (String id : Live.IDS) names.add(Live.PREFIX + id);
             String next = names.get((names.indexOf(theme) + 1) % names.size());
             prefs.edit().putString(Themes.PREF, next).apply(); build();
         });

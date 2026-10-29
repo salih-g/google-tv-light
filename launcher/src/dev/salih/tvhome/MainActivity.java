@@ -114,6 +114,7 @@ public class MainActivity extends Activity {
         prefs = getSharedPreferences(Sky.PREFS, MODE_PRIVATE);
         Context app = getApplicationContext();
         Wallpapers.sun = t -> Sky.slot(app, t);   // real sunrise/sunset once the weather has been fetched
+        Live.phase = t -> Sky.phase(app, t);
         buildUi();
         setContentView(root);
         int w = getResources().getDisplayMetrics().widthPixels, h = getResources().getDisplayMetrics().heightPixels;
@@ -206,6 +207,7 @@ public class MainActivity extends Activity {
 
     /** Move mode takes the arrows, OK and Back before the focused tile does (OK would open the app). */
     @Override public boolean dispatchKeyEvent(KeyEvent e) {
+        if (e.getAction() == KeyEvent.ACTION_DOWN && wallpapers != null) wallpapers.hold();
         if (moving != null && gridPanel.getVisibility() == View.VISIBLE) {
             int code = e.getKeyCode();
             boolean ours = code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT || code == KeyEvent.KEYCODE_DPAD_UP
