@@ -132,8 +132,6 @@ final class Wallpapers {
     }
     void stop() { handler.removeCallbacks(tick); if (live != null) live.stop(); }
 
-    /** A remote key was pressed: a living wallpaper keeps still for a moment. */
-    void hold() { if (live != null) live.hold(); }
 
     /** Called when the clock minute changes; switches frame exactly at a slot boundary. */
     void onMinute() {

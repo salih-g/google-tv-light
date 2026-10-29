@@ -13,9 +13,8 @@ import java.util.Random;
 
 /**
  * A living pixel-art wallpaper (Valley). The scene paints a 128x72 buffer ten times a second; the buffer is scaled up with crisp
- * pixels and a thin mosaic grid, so each frame costs one tiny texture upload. This TV composites every frame on the
- * GPU, so the animation pauses while a remote key was pressed in the last 1.5 s (navigation stays smooth) and stops
- * whenever Home or the screensaver is not on screen. Chosen in Home settings > Wallpaper ("live:<id>").
+ * pixels and a thin mosaic grid, so each frame costs one tiny texture upload (measured on the TV: the same GPU time
+ * per frame as a photo, no extra jank while navigating). It stops whenever Home or the screensaver is not on screen. Chosen in Home settings > Wallpaper ("live:<id>").
  */
 abstract class Live extends Drawable implements Runnable {
     static final String PREFIX = "live:";
@@ -43,7 +42,7 @@ abstract class Live extends Drawable implements Runnable {
     }
 
     static final int W = 128, H = 72;
-    private static final long FRAME_MS = 100, HOLD_MS = 1500;
+    private static final long FRAME_MS = 100;
 
     final int[] px = new int[W * H];
     private final Bitmap buf = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888);
@@ -52,7 +51,6 @@ abstract class Live extends Drawable implements Runnable {
     private float[] lines = new float[0];
     private final long born = SystemClock.uptimeMillis();
     private boolean running, painted;
-    private long heldUntil;
     final Random seed = new Random(7);
 
     static Live create(String pref) {
@@ -89,13 +87,9 @@ abstract class Live extends Drawable implements Runnable {
         unscheduleSelf(this);
     }
 
-    /** A remote key was pressed: keep still for a moment so the GPU is free for the focus animations. */
-    void hold() { heldUntil = SystemClock.uptimeMillis() + HOLD_MS; }
-
     @Override public void run() {
         if (!running) return;
         long now = SystemClock.uptimeMillis();
-        if (now < heldUntil) { scheduleSelf(this, heldUntil); return; }
         step();
         invalidateSelf();
         scheduleSelf(this, now + FRAME_MS);
@@ -184,7 +178,7 @@ abstract class Live extends Drawable implements Runnable {
 
         private final int[] far = new int[W], mid = new int[W], near = new int[W];
         private final int[][] trees = new int[16][2];   // x, height
-        private final float[][] stars = new float[80][3], rain = new float[130][3], snow = new float[110][4];
+        private final float[][] stars = new float[80][3], rain = new float[70][3], snow = new float[110][4];
         private final float[][] clouds = {{8, 9, 0.9f, 1.0f}, {52, 15, 0.6f, 0.8f}, {96, 7, 1.1f, 1.2f}, {30, 19, 0.75f, 0.9f},
                 {78, 12, 0.5f, 1.1f}, {118, 18, 0.8f, 0.85f}, {18, 4, 0.65f, 1.15f}, {64, 3, 0.95f, 1.0f}};
         private Object[] from, to;
@@ -204,7 +198,7 @@ abstract class Live extends Drawable implements Runnable {
                 trees[i][0] = x; trees[i][1] = 4 + seed.nextInt(3);
             }
             for (float[] s : stars) { s[0] = seed.nextInt(W); s[1] = seed.nextInt(30); s[2] = seed.nextFloat() * 6.3f; }
-            for (float[] r : rain) { r[0] = seed.nextFloat() * W; r[1] = seed.nextFloat() * H; r[2] = 30 + seed.nextFloat() * 15; }
+            for (float[] r : rain) { r[0] = seed.nextFloat() * W; r[1] = seed.nextFloat() * H; r[2] = 10 + seed.nextFloat() * 6; }   // cells a second: about one cell a frame, so the steps read as falling, not jumping
             for (float[] s : snow) { s[0] = seed.nextFloat() * W; s[1] = seed.nextFloat() * H; s[2] = 3 + seed.nextFloat() * 4; s[3] = seed.nextFloat() * 6.3f; }
         }
 

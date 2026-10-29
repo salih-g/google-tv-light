@@ -173,9 +173,9 @@ yaz ve yeniden derlemeden gönder: `tvclean.py themes temalarim.json --yes`.
 ve bir kulübe; piksel çizimi ve canlı. Işık gerçek güneşi (sabah, gündüz, altın ikindi, gün batımı,
 ay ışıklı gece), gökyüzü gerçek havayı (açık, parçalı bulutlu, kapalı, sis, çisenti, yağmur, yere
 yağan kar, şimşekli fırtına) izler; ikisinin her kombinasyonu var ve ikisi de yavaşça geçer. Saniyede
-on kez 128x72'lik bir kare çizilip büyütülür, yani her kare tek küçük bir doku; herhangi bir kumanda
-tuşundan sonra 1,5 sn durur, böylece gezinme akıcı kalır; Home ya da ekran koruyucu ekranda değilken
-tamamen durur. Ana ekran ayarları > Duvar kâğıdı'ndan seçilir.
+on kez 128x72'lik bir kare çizilip büyütülür, yani her kare tek küçük bir doku (TV'de ölçüldü:
+kare başına GPU süresi fotoğrafla aynı, gezinirken ek takılma yok); Home ya da ekran koruyucu ekranda
+değilken tamamen durur. Ana ekran ayarları > Duvar kâğıdı'ndan seçilir.
 
 **AdGuard Home.** Adresi ve girişi Ana ekran ayarlarında girilince bir kalkan hapı koruma durumunu
 ve son 24 saati (sorgu, engellenen, ortalama süre) gösterir, korumayı 5 dakika duraklatıp geri

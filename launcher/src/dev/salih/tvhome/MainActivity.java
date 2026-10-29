@@ -208,7 +208,6 @@ public class MainActivity extends Activity {
 
     /** Move mode takes the arrows, OK and Back before the focused tile does (OK would open the app). */
     @Override public boolean dispatchKeyEvent(KeyEvent e) {
-        if (e.getAction() == KeyEvent.ACTION_DOWN && wallpapers != null) wallpapers.hold();
         if (moving != null && gridPanel.getVisibility() == View.VISIBLE) {
             int code = e.getKeyCode();
             boolean ours = code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT || code == KeyEvent.KEYCODE_DPAD_UP

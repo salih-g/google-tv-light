@@ -175,8 +175,8 @@ cabin, drawn in pixels and alive. The light follows the real sun (dawn, day, gol
 sunset, moonlit night) and the sky the real weather (clear, partly cloudy, overcast, fog, drizzle,
 rain, snow settling on the ground, thunderstorms with lightning), every combination of the two, and
 both change gradually. A 128x72 frame is drawn ten times a second and scaled up, so each frame is
-one tiny texture; the scene keeps still for 1.5 s after any remote key, so navigation stays smooth,
-and stops whenever Home and the screensaver are not on screen. Pick it in Home settings >
+one tiny texture (measured on the TV: the same GPU time per frame as a photo, no extra jank while
+navigating); it stops whenever Home and the screensaver are not on screen. Pick it in Home settings >
 Wallpaper.
 
 **AdGuard Home.** Once its address and login are set in Home settings, a shield pill shows
