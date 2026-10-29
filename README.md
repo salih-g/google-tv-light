@@ -170,11 +170,13 @@ palette per time of day; each wallpaper change draws the same palette in a new a
 [`launcher/themes/themes.json`](launcher/themes/themes.json) ships four; write your own in the same
 shape and send it without rebuilding: `tvclean.py themes my-themes.json --yes`.
 
-**Living wallpapers.** Pixel-art scenes that move: *Sky* (dawn, day, golden afternoon, sunset and a
-moonlit night, following the real sun; a change of light blends over a minute), *Koi pond*,
-*Fireflies* and *Jellyfish*. A 128x72 frame is drawn ten times a second and scaled up, so each frame
-is one tiny texture; the scene keeps still for 1.5 s after any remote key, so navigation stays
-smooth, and stops whenever Home and the screensaver are not on screen. Pick one in Home settings >
+**Living wallpaper.** *Pixel valley*: snowy peaks, ridges, a meadow with a lake, pine hills and a
+cabin, drawn in pixels and alive. The light follows the real sun (dawn, day, golden afternoon,
+sunset, moonlit night) and the sky the real weather (clear, partly cloudy, overcast, fog, drizzle,
+rain, snow settling on the ground, thunderstorms with lightning), every combination of the two, and
+both change gradually. A 128x72 frame is drawn ten times a second and scaled up, so each frame is
+one tiny texture; the scene keeps still for 1.5 s after any remote key, so navigation stays smooth,
+and stops whenever Home and the screensaver are not on screen. Pick it in Home settings >
 Wallpaper.
 
 **AdGuard Home.** Once its address and login are set in Home settings, a shield pill shows

@@ -12,18 +12,26 @@ import android.os.SystemClock;
 import java.util.Random;
 
 /**
- * Living pixel-art wallpapers. A scene paints a 128x72 buffer ten times a second; the buffer is scaled up with crisp
+ * A living pixel-art wallpaper (Valley). The scene paints a 128x72 buffer ten times a second; the buffer is scaled up with crisp
  * pixels and a thin mosaic grid, so each frame costs one tiny texture upload. This TV composites every frame on the
  * GPU, so the animation pauses while a remote key was pressed in the last 1.5 s (navigation stays smooth) and stops
  * whenever Home or the screensaver is not on screen. Chosen in Home settings > Wallpaper ("live:<id>").
  */
 abstract class Live extends Drawable implements Runnable {
     static final String PREFIX = "live:";
-    static final String[] IDS = {"sky", "koi", "fireflies", "jellyfish"};
-    static final String[] LABELS = {"Sky", "Koi pond", "Fireflies", "Jellyfish"};
+    static final String[] IDS = {"valley"};
+    static final String[] LABELS = {"Pixel valley"};
 
     /** sabah, gunduz, ikindi, aksam or gece for a time (Sky.phase: the real sun); null = fixed hours. Home sets it. */
     static volatile java.util.function.LongFunction<String> phase;
+
+    /** The current WMO weather code (Open-Meteo), or -1 when unknown. Home sets it. */
+    static volatile java.util.function.IntSupplier weather;
+
+    static int currentWeather() {
+        java.util.function.IntSupplier w = weather;
+        return w == null ? -1 : w.getAsInt();
+    }
 
     static String currentPhase() {
         long now = System.currentTimeMillis();
@@ -50,10 +58,7 @@ abstract class Live extends Drawable implements Runnable {
     static Live create(String pref) {
         if (pref == null || !pref.startsWith(PREFIX)) return null;
         switch (pref.substring(PREFIX.length())) {
-            case "koi": return new Koi();
-            case "fireflies": return new Fireflies();
-            case "sky": return new Sky();
-            case "jellyfish": return new Jellyfish();
+            case "valley": return new Valley();
             default: return null;
         }
     }
@@ -157,135 +162,63 @@ abstract class Live extends Drawable implements Runnable {
 
     static float wrap(float v, float span) { v %= span; return v < 0 ? v + span : v; }
 
-    // ---------- scenes ----------
-
-    /** Orange and white koi circling under lily pads; the water glints. */
-    static final class Koi extends Live {
-        private final float[][] fish = {   // cx, cy, rx, ry, speed, phase, pattern
-                {40, 30, 26, 14, 0.22f, 0.0f, 0}, {84, 44, 30, 16, -0.17f, 2.0f, 1},
-                {64, 36, 46, 22, 0.13f, 4.1f, 2}, {96, 22, 18, 10, -0.27f, 1.0f, 1}};
-        private final float[][] pads = {{18, 14, 6}, {108, 58, 7}, {30, 60, 5}, {116, 16, 5}, {70, 10, 4}};
-
-        @Override void paint(float t) {
-            vertical(rgb(0x0F6670), rgb(0x0A3B47));
-            for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) {
-                double s = Math.sin(x * 0.31 + t * 1.3 + Math.sin(y * 0.45 + t * 0.6) * 1.8) * Math.sin(y * 0.27 - t * 0.9);
-                if (s > 0.86) blend(x, y, rgb(0x6FD3D1), (float) (s - 0.86) * 4f);
-            }
-            for (float[] f : fish) fish(f, t, true);
-            for (float[] f : fish) fish(f, t, false);
-            for (float[] p : pads) pad(p[0], p[1], p[2]);
-            disc(19, 13, 1.6f, rgb(0xF4A6C0)); set(19, 13, rgb(0xFFD166));   // a flower on the first pad
-        }
-
-        private void fish(float[] f, float t, boolean shadow) {
-            float a = t * f[4] + f[5];
-            float hx = f[0] + (float) Math.cos(a) * f[2], hy = f[1] + (float) Math.sin(a) * f[3];
-            float dx = (float) -Math.sin(a) * f[2] * Math.signum(f[4]), dy = (float) Math.cos(a) * f[3] * Math.signum(f[4]);
-            float len = (float) Math.hypot(dx, dy); dx /= len; dy /= len;   // heading
-            float nx = -dy, ny = dx;
-            int body = rgb(0xF26B1D), white = rgb(0xF5F1E8), fin = rgb(0xF59A5B), shade = rgb(0x05222A);
-            final float L = 11;
-            for (float s = 0; s <= L + 3; s += 0.4f) {
-                float wig = (float) Math.sin(t * 6 + s * 0.6) * 0.1f * s;   // the body bends more toward the tail
-                float x = hx - dx * s + nx * wig, y = hy - dy * s + ny * wig;
-                if (s > L) {   // tail fin: a fan that opens behind the body
-                    float spread = (s - L) * 0.9f + 0.5f;
-                    for (int side = -1; side <= 1; side += 2) {
-                        float fx = x + nx * spread * side, fy = y + ny * spread * side;
-                        if (shadow) blend(Math.round(fx + 2), Math.round(fy + 2), shade, 0.3f); else set(Math.round(fx), Math.round(fy), fin);
-                    }
-                    continue;
-                }
-                float r = s < 3 ? 1.5f + 0.3f * s : s < 6 ? 2.4f : 2.4f * (1 - (s - 6) / (L - 6)) + 0.5f;
-                if (shadow) { shadowDisc(x + 2, y + 2, r, shade); continue; }
-                boolean patch = f[6] == 0 ? s > 3.5f && s < 6.5f : f[6] == 1 ? s < 2.5f || (s > 6 && s < 7.5f) : s > 1.5f && s < 4f;
-                disc(x, y, r, patch ? white : body);
-            }
-            if (shadow) return;
-            for (int side = -1; side <= 1; side += 2) {   // pectoral fins and eyes
-                float flap = (float) Math.sin(t * 4 + side) * 0.5f;
-                set(Math.round(hx - dx * 3.5f + nx * (3.4f + flap) * side), Math.round(hy - dy * 3.5f + ny * (3.4f + flap) * side), fin);
-                set(Math.round(hx - dx * 0.8f + nx * 0.9f * side), Math.round(hy - dy * 0.8f + ny * 0.9f * side), rgb(0x1A1A1A));
-            }
-        }
-
-        private void shadowDisc(float cx, float cy, float r, int c) {
-            for (int y = (int) Math.floor(cy - r); y <= cy + r; y++)
-                for (int x = (int) Math.floor(cx - r); x <= cx + r; x++)
-                    if ((x + 0.5f - cx) * (x + 0.5f - cx) + (y + 0.5f - cy) * (y + 0.5f - cy) <= r * r) blend(x, y, c, 0.06f);
-        }
-
-        private void pad(float cx, float cy, float r) {
-            for (int y = (int) (cy - r); y <= cy + r; y++) for (int x = (int) (cx - r); x <= cx + r; x++) {
-                float ddx = x + 0.5f - cx, ddy = y + 0.5f - cy, d = ddx * ddx + ddy * ddy;
-                if (d > r * r) continue;
-                double ang = Math.atan2(ddy, ddx);
-                if (ang > 0.15 && ang < 0.75) continue;   // the notch
-                set(x, y, d > (r - 1.2f) * (r - 1.2f) ? rgb(0x5DB75F) : rgb(0x3E8E41));
-            }
-        }
-    }
-
-    /** Fireflies blinking over dark grass under a tree line. */
-    static final class Fireflies extends Live {
-        private final float[][] flies = new float[26][6];
-        private final int[] trees = new int[W], grass = new int[W];
-
-        Fireflies() {
-            for (float[] f : flies) {
-                f[0] = seed.nextFloat() * W; f[1] = 14 + seed.nextFloat() * 44;
-                f[2] = 0.2f + seed.nextFloat() * 0.5f; f[3] = seed.nextFloat() * 6.3f;
-                f[4] = 0.6f + seed.nextFloat() * 1.2f; f[5] = seed.nextFloat() * 6.3f;
-            }
-            for (int x = 0; x < W; x++) {
-                trees[x] = 40 + (int) (Math.sin(x * 0.11) * 3 + Math.sin(x * 0.37 + 1) * 2 + seed.nextInt(2));
-                grass[x] = 4 + seed.nextInt(6);
-            }
-        }
-
-        @Override void paint(float t) {
-            vertical(rgb(0x03100C), rgb(0x0A2418));
-            int tree = rgb(0x061A10), blade = rgb(0x0E3B22), tip = rgb(0x14502E);
-            for (int x = 0; x < W; x++) for (int y = trees[x]; y < H; y++) set(x, y, tree);
-            for (int x = 0; x < W; x++) {
-                int sway = (int) Math.round(Math.sin(t * 0.9 + x * 0.33) * 0.7);
-                for (int k = 0; k < grass[x]; k++) set(x + (k > grass[x] - 3 ? sway : 0), H - 1 - k, k == grass[x] - 1 ? tip : blade);
-            }
-            int glow = rgb(0xE9FF8A);
-            for (float[] f : flies) {
-                float x = f[0] + (float) Math.sin(t * f[2] + f[3]) * 7, y = f[1] + (float) Math.cos(t * f[2] * 0.8f + f[5]) * 4;
-                float b = (float) Math.pow(Math.max(0, Math.sin(t * f[4] + f[5])), 3);
-                if (b < 0.02f) continue;
-                int cx = Math.round(x), cy = Math.round(y);
-                blend(cx, cy, glow, b);
-                blend(cx + 1, cy, glow, b * 0.4f); blend(cx - 1, cy, glow, b * 0.4f);
-                blend(cx, cy + 1, glow, b * 0.4f); blend(cx, cy - 1, glow, b * 0.4f);
-                blend(cx + 1, cy + 1, glow, b * 0.15f); blend(cx - 1, cy - 1, glow, b * 0.15f);
-                blend(cx + 1, cy - 1, glow, b * 0.15f); blend(cx - 1, cy + 1, glow, b * 0.15f);
-            }
-        }
-    }
+    // ---------- the scene ----------
 
     /**
-     * The sky through the day: dawn, day, golden afternoon, sunset and a moonlit night, with the same slow pixel
-     * clouds. The part of the day comes from `phase` (the real sunrise and sunset); a change blends over a minute.
+     * A pixel mountain valley: far snowy peaks, nearer ridges, a meadow with a lake, pine hills and a small cabin.
+     * The light follows the real sun (dawn, day, golden afternoon, sunset, moonlit night) and the sky the real
+     * weather (clear, partly cloudy, overcast, fog, drizzle, rain, snow, thunderstorm); both change gradually.
      */
-    static final class Sky extends Live {
-        /** top, bottom, cloud, cloud underside, body (sun or moon), halo; then star strength, body x, y, radius, moon? */
+    static final class Valley extends Live {
+        /** name, sky top, sky bottom, cloud, cloud underside, sun or moon, halo, stars, body x, body y, radius, moon?,
+         *  terrain light (0..1), terrain tint */
         private static final Object[][] PALETTES = {
-                {"sabah",  0x3B4A8C, 0xF6B38E, 0xFFE3D3, 0xD9A0A8, 0xFFD9A0, 0xFFC48A, 0.15f, 0.22f, 0.62f, 6f, false},
-                {"gunduz", 0x2F7BD9, 0xA8D8F7, 0xFFFFFF, 0xC9DCF0, 0xFFF4B8, 0xFFF9D6, 0.00f, 0.76f, 0.22f, 6f, false},
-                {"ikindi", 0x3B78C0, 0xF5D7A1, 0xFFF6E6, 0xE3C59E, 0xFFE08A, 0xFFD27A, 0.00f, 0.70f, 0.42f, 6.5f, false},
-                {"aksam",  0x3A2466, 0xFF8A5B, 0xFFB7A5, 0xB5677F, 0xFFB347, 0xFF8A5B, 0.25f, 0.50f, 0.66f, 8f, false},
-                {"gece",   0x090E2B, 0x1B2A66, 0xC9CCE8, 0x8E94C4, 0xF2E9C9, 0x8A93C9, 1.00f, 0.78f, 0.27f, 8f, true}};
-        private final float[][] stars = new float[80][3];
-        private final float[][] clouds = {{10, 14, 0.9f, 1.0f}, {60, 24, 0.6f, 0.8f}, {100, 46, 1.2f, 1.2f}, {30, 52, 0.75f, 0.9f}};
+                {"sabah",  0x3B4A8C, 0xF6B38E, 0xFFE3D3, 0xD9A0A8, 0xFFD9A0, 0xFFC48A, 0.15f, 0.22f, 0.30f, 5f, false, 0.80f, 0xF6B38E},
+                {"gunduz", 0x2F7BD9, 0xA8D8F7, 0xFFFFFF, 0xC9DCF0, 0xFFF4B8, 0xFFF9D6, 0.00f, 0.76f, 0.14f, 5f, false, 1.00f, 0xFFFFFF},
+                {"ikindi", 0x3B78C0, 0xF5D7A1, 0xFFF6E6, 0xE3C59E, 0xFFE08A, 0xFFD27A, 0.00f, 0.70f, 0.24f, 5.5f, false, 0.92f, 0xF5D7A1},
+                {"aksam",  0x3A2466, 0xFF8A5B, 0xFFB7A5, 0xB5677F, 0xFFB347, 0xFF8A5B, 0.25f, 0.50f, 0.26f, 6.5f, false, 0.62f, 0xFF8A5B},
+                {"gece",   0x090E2B, 0x1B2A66, 0xC9CCE8, 0x8E94C4, 0xF2E9C9, 0x8A93C9, 1.00f, 0.78f, 0.16f, 6f, true, 0.30f, 0x3B4A8C}};
+        private static final int FAR = 0x7F97BA, SNOWCAP = 0xEEF3F8, MID = 0x4C7558, MEADOW = 0x6A9A4A, NEAR = 0x3F6E36,
+                TREE = 0x24452A, WALL = 0x8A5A3C, ROOF = 0x4A2C2C, NIGHT = 0x0A0F22;
+        private static final int LAKE_X = 66, LAKE_Y = 46;
+
+        private final int[] far = new int[W], mid = new int[W], near = new int[W];
+        private final int[][] trees = new int[16][2];   // x, height
+        private final float[][] stars = new float[80][3], rain = new float[130][3], snow = new float[110][4];
+        private final float[][] clouds = {{8, 9, 0.9f, 1.0f}, {52, 15, 0.6f, 0.8f}, {96, 7, 1.1f, 1.2f}, {30, 19, 0.75f, 0.9f},
+                {78, 12, 0.5f, 1.1f}, {118, 18, 0.8f, 0.85f}, {18, 4, 0.65f, 1.15f}, {64, 3, 0.95f, 1.0f}};
         private Object[] from, to;
         private float changedAt = -1000;
+        /** cloud cover, rain, snow, fog, storm, snow on the ground: the shown values ease toward the weather's */
+        private float[] wx;
 
-        Sky() {
-            for (float[] s : stars) { s[0] = seed.nextInt(W); s[1] = seed.nextInt(H * 3 / 4); s[2] = seed.nextFloat() * 6.3f; }
+        Valley() {
+            for (int x = 0; x < W; x++) {
+                far[x] = (int) (26 + 5 * Math.sin(x * 0.065 + 0.3) + 3 * Math.sin(x * 0.16 + 1.7) + 1.5 * Math.sin(x * 0.37));
+                mid[x] = (int) (40 + 3.5 * Math.sin(x * 0.08 + 2.1) + 2 * Math.sin(x * 0.21 + 0.5));
+                near[x] = (int) (52 + 3 * Math.sin(x * 0.05 + 1.2) + 2 * Math.sin(x * 0.15) + 4 * Math.exp(-Math.pow((x - LAKE_X) / 20.0, 2)));
+            }
+            for (int i = 0; i < trees.length; i++) {
+                int x;
+                do { x = seed.nextInt(W); } while (Math.abs(x - 100) < 6 || Math.abs(x - LAKE_X) < 14);   // not on the cabin or the lake
+                trees[i][0] = x; trees[i][1] = 4 + seed.nextInt(3);
+            }
+            for (float[] s : stars) { s[0] = seed.nextInt(W); s[1] = seed.nextInt(30); s[2] = seed.nextFloat() * 6.3f; }
+            for (float[] r : rain) { r[0] = seed.nextFloat() * W; r[1] = seed.nextFloat() * H; r[2] = 30 + seed.nextFloat() * 15; }
+            for (float[] s : snow) { s[0] = seed.nextFloat() * W; s[1] = seed.nextFloat() * H; s[2] = 3 + seed.nextFloat() * 4; s[3] = seed.nextFloat() * 6.3f; }
+        }
+
+        /** Target weather for a WMO code (Open-Meteo): cloud, rain, snow, fog, storm. */
+        private static float[] weatherFor(int code) {
+            if (code < 0 || code == 0) return new float[]{0.10f, 0, 0, 0, 0};
+            if (code == 1) return new float[]{0.25f, 0, 0, 0, 0};
+            if (code == 2) return new float[]{0.50f, 0, 0, 0, 0};
+            if (code == 3) return new float[]{0.95f, 0, 0, 0, 0};
+            if (code == 45 || code == 48) return new float[]{0.60f, 0, 0, 1, 0};
+            if (code >= 51 && code <= 57) return new float[]{0.80f, 0.35f, 0, 0.2f, 0};
+            if ((code >= 71 && code <= 77) || code == 85 || code == 86) return new float[]{0.85f, 0, code == 75 || code == 86 ? 1 : 0.7f, 0, 0};
+            if (code >= 95) return new float[]{1.00f, 1, 0, 0, 1};
+            return new float[]{0.90f, code == 65 || code == 82 ? 1 : 0.75f, 0, 0, 0};   // rain, showers
         }
 
         private static Object[] palette(String name) {
@@ -294,29 +227,95 @@ abstract class Live extends Drawable implements Runnable {
         }
 
         @Override void paint(float t) {
+            // light: the part of the day, blended over a minute when it changes
             Object[] want = palette(currentPhase());
-            if (to == null) { from = to = want; }
-            else if (want != to) { from = to; to = want; changedAt = t; }
-            float k = Math.min(1f, (t - changedAt) / 60f);   // a minute from the old light to the new
-            vertical(rgb(col(1, k)), rgb(col(2, k)));
-            float starA = num(7, k);
+            if (to == null) { from = to = want; } else if (want != to) { from = to; to = want; changedAt = t; }
+            float k = Math.min(1f, (t - changedAt) / 60f);
+            // weather: eases toward the forecast (snow settles on the ground more slowly)
+            float[] target = weatherFor(currentWeather());
+            if (wx == null) wx = new float[]{target[0], target[1], target[2], target[3], target[4], target[2] > 0 ? 1 : 0};
+            for (int i = 0; i < 5; i++) wx[i] += (target[i] - wx[i]) * 0.012f;
+            wx[5] += ((target[2] > 0 ? 1 : 0) - wx[5]) * 0.004f;
+            float cloud = wx[0], wet = wx[1], snowing = wx[2], fog = wx[3], storm = wx[4], cover = wx[5];
+            float overcast = Math.max(0, (cloud - 0.4f) / 0.6f), light = num(12, k) * (1 - 0.25f * overcast);
+            int gray = mix(rgb(0x8E99A8), rgb(0x1A1F2B), 1 - num(12, k));
+
+            int top = mix(rgb(col(1, k)), gray, overcast * 0.75f), bottom = mix(rgb(col(2, k)), gray, overcast * 0.7f);
+            float flash = storm > 0.5f ? lightning(t) : 0;
+            if (flash > 0) { top = mix(top, rgb(0xE6E9FF), 0.5f * flash); bottom = mix(bottom, rgb(0xE6E9FF), 0.4f * flash); }
+            vertical(top, bottom);
+
+            float starA = num(7, k) * (1 - cloud);
             if (starA > 0.01f) for (float[] s : stars)
                 blend((int) s[0], (int) s[1], rgb(0xFFFFFF), starA * (0.35f + 0.45f * (float) Math.sin(t * 1.7 + s[2])));
-            body(W * num(8, k), H * num(9, k), num(10, k), rgb(col(5, k)), rgb(col(6, k)), (boolean) (k < 0.5f ? from : to)[11]);
-            for (float[] c : clouds) cloud(wrap(c[0] + t * c[2], W + 40) - 20, c[1], c[3], rgb(col(3, k)), rgb(col(4, k)));
+            body(W * num(8, k), H * num(9, k), num(10, k), rgb(col(5, k)), rgb(col(6, k)), (boolean) (k < 0.5f ? from : to)[11], 1 - overcast * 0.9f);
+
+            int tint = rgb(col(13, k));
+            // far peaks, hazy with the sky behind them, snow on the tops
+            for (int x = 0; x < W; x++) for (int y = far[x]; y < H; y++) {
+                boolean cap = far[x] < 27 && y < far[x] + 2;
+                set(x, y, mix(land(cap ? SNOWCAP : FAR, tint, light, overcast), bottom, 0.35f));
+            }
+            int cTop = mix(rgb(col(3, k)), mix(rgb(0x5A6170), rgb(0x20242E), 1 - light), Math.min(1, wet * 0.6f + storm * 0.4f + overcast * 0.35f + snowing * 0.3f));
+            int cUnder = mix(rgb(col(4, k)), mix(rgb(0x434957), rgb(0x161A22), 1 - light), Math.min(1, wet * 0.6f + storm * 0.4f + overcast * 0.35f + snowing * 0.3f));
+            int shown = Math.round(2 + cloud * (clouds.length - 2));
+            for (int i = 0; i < shown; i++) { float[] c = clouds[i]; cloud(wrap(c[0] + t * c[2], W + 40) - 20, c[1], c[3], cTop, cUnder); }
+            if (flash > 0.6f) bolt(t);
+
+            // the ridge, the meadow, the lake, the pine hills and the cabin
+            for (int x = 0; x < W; x++) for (int y = mid[x]; y < H; y++) set(x, y, land(snowy(MID, y - mid[x], cover), tint, light, overcast));
+            for (int x = 0; x < W; x++) for (int y = mid[x] + 3; y < H; y++) set(x, y, land(snowy(MEADOW, y - mid[x] - 3, cover), tint, light, overcast));
+            lake(t, top, bottom, light, wet);
+            for (int x = 0; x < W; x++) for (int y = near[x]; y < H; y++) set(x, y, land(snowy(NEAR, y - near[x], cover), tint, light, overcast));
+            for (int[] tr : trees) tree(tr[0], near[tr[0]], tr[1], tint, light, overcast, cover);
+            cabin(100, near[100], tint, light, overcast, cover, t);
+
+            if (fog > 0.01f) {
+                int fogC = mix(rgb(0xD5DAE0), rgb(0x2B3140), 1 - light);
+                for (int y = 12; y < H; y++) {
+                    float row = 0.4f + 0.35f * (float) Math.exp(-Math.pow((y - 40) / 12.0, 2));   // thickest over the valley floor
+                    float bank = 0.85f + 0.15f * (float) Math.sin(y * 0.55 + 1.3);
+                    for (int x = 0; x < W; x++)
+                        blend(x, y, fogC, fog * row * bank * (0.85f + 0.15f * (float) Math.sin(x * 0.045 + t * 0.2 + y * 0.08)));
+                }
+            }
+            int drop = mix(rgb(0xA9B8CC), rgb(0x5C6A80), 1 - light);
+            for (int i = 0; i < Math.round(rain.length * wet); i++) {
+                float[] r = rain[i];
+                int x = (int) wrap(r[0] - t * r[2] * 0.3f, W), y = (int) wrap(r[1] + t * r[2], H);
+                blend(x, y, drop, 0.65f); blend(x + 1, y - 1, drop, 0.45f); blend(x + 2, y - 2, drop, 0.2f);   // a slanted streak
+            }
+            for (int i = 0; i < Math.round(snow.length * snowing); i++) {
+                float[] s = snow[i];
+                blend((int) (s[0] + Math.sin(t * 0.8 + s[3]) * 1.5f), (int) wrap(s[1] + t * s[2], H), rgb(0xFFFFFF), 0.85f);
+            }
         }
 
         private int col(int i, float k) { return mix(0xFF000000 | (int) from[i], 0xFF000000 | (int) to[i], k) & 0xFFFFFF; }
 
         private float num(int i, float k) { return (float) from[i] + ((float) to[i] - (float) from[i]) * k; }
 
-        /** The sun with a soft halo, or the crescent moon. */
-        private void body(float bx, float by, float r, int c, int halo, boolean moon) {
+        /** A land colour in this light: tinted by the sky, darker at night, a little grey under heavy cloud. */
+        private static int land(int base, int tint, float light, float overcast) {
+            int c = mix(0xFF000000 | base, tint, 0.18f);
+            c = mix(c, rgb(NIGHT), 1 - light);
+            return mix(c, rgb(0x6B7280), overcast * 0.15f);
+        }
+
+        /** Ground under snow, before the light: white on top, the colour showing through a little deeper down. */
+        private static int snowy(int base, int depth, float cover) {
+            if (cover < 0.01f) return base;
+            float f = cover * (depth == 0 ? 1f : depth < 3 ? 0.85f : 0.7f);
+            return mix(0xFF000000 | base, rgb(depth == 0 ? 0xF4F7FA : 0xDCE3EA), f) & 0xFFFFFF;
+        }
+
+        private void body(float bx, float by, float r, int c, int halo, boolean moon, float shown) {
+            if (shown <= 0.05f) return;
             for (int y = (int) (by - r - 4); y <= by + r + 4; y++) for (int x = (int) (bx - r - 4); x <= bx + r + 4; x++) {
                 float d = (float) Math.hypot(x + 0.5f - bx, y + 0.5f - by);
-                boolean in = d <= r && (!moon || Math.hypot(x + 0.5f - bx - 3.5f, y + 0.5f - by + 2.5f) > r * 0.9f);
-                if (in) set(x, y, c);
-                else if (d <= r + 4 && d > r) blend(x, y, halo, (moon ? 0.12f : 0.22f) * (r + 4 - d) / 4f * 3f);
+                boolean in = d <= r && (!moon || Math.hypot(x + 0.5f - bx - 3, y + 0.5f - by + 2) > r * 0.9f);
+                if (in) blend(x, y, c, shown);
+                else if (d <= r + 4 && d > r) blend(x, y, halo, shown * (moon ? 0.12f : 0.22f) * (r + 4 - d) / 4f * 3f);
             }
         }
 
@@ -325,37 +324,58 @@ abstract class Live extends Drawable implements Runnable {
             for (float[] b : bumps) disc(x + b[0] * s, y + b[1] * s + 1.2f, b[2] * s, under);   // shaded underside
             for (float[] b : bumps) disc(x + b[0] * s, y + b[1] * s, b[2] * s, top);
         }
-    }
 
-    /** Jellyfish pulsing upward through blue water, with light rays and drifting specks. */
-    static final class Jellyfish extends Live {
-        private final float[][] jelly = {{28, 0, 1.6f, 0.0f, 1.0f}, {78, 30, 1.1f, 2.0f, 1.3f}, {108, 55, 1.9f, 4.0f, 0.8f}};
-        private final float[][] specks = new float[45][3];
-
-        Jellyfish() { for (float[] s : specks) { s[0] = seed.nextInt(W); s[1] = seed.nextFloat() * H; s[2] = 0.5f + seed.nextFloat(); } }
-
-        @Override void paint(float t) {
-            vertical(rgb(0x0F4C81), rgb(0x061633));
-            for (int y = 0; y < H * 2 / 3; y++) for (int x = 0; x < W; x++)
-                if (wrap(x + y * 0.55f - t * 1.5f, 34) < 5) blend(x, y, rgb(0x5FA8E8), 0.18f * (1 - y / (H * 0.66f)));
-            for (float[] s : specks) blend((int) s[0], (int) wrap(s[1] - t * s[2], H), rgb(0xB8D8F5), 0.35f);
-            for (float[] j : jelly) jelly(j, t);
+        /** The lake mirrors the sky; it glints, and rain rings it. */
+        private void lake(float t, int top, int bottom, float light, float wet) {
+            for (int y = LAKE_Y; y < LAKE_Y + 6; y++) {
+                float half = 26 - (y - LAKE_Y) * (y - LAKE_Y) * 0.9f;
+                for (int x = (int) (LAKE_X - half); x <= LAKE_X + half; x++) {
+                    if (y >= near[Math.max(0, Math.min(W - 1, x))]) continue;
+                    int c = mix(mix(bottom, top, (y - LAKE_Y) / 6f), rgb(0x0A1A2A), 0.3f + 0.3f * (1 - light));
+                    if (Math.sin(x * 0.5 + t * 1.5 + y * 1.3) > 0.88) c = mix(c, rgb(0xFFFFFF), 0.25f * light + 0.05f);
+                    if (wet > 0.15f && hash(x * 31 + y * 17 + (int) (t * 3)) < wet * 0.12f) c = mix(c, rgb(0xC8D4E2), 0.5f);
+                    set(x, y, c);
+                }
+            }
         }
 
-        private void jelly(float[] j, float t) {
-            float x = j[0] + (float) Math.sin(t * 0.3 + j[3]) * 6;
-            float y = wrap(j[1] - t * j[2], H + 30) + 6;
-            float p = 0.5f + 0.5f * (float) Math.sin(t * 2.2 + j[3]);
-            float rx = (5 + p) * j[4], ry = (4 - 0.8f * p) * j[4];
-            int bell = rgb(0xE58FD8), rim = rgb(0xF7C6EE), tent = rgb(0xC77BC0);
-            for (int yy = (int) (y - ry); yy <= y; yy++) for (int xx = (int) (x - rx); xx <= x + rx; xx++) {
-                float u = (xx + 0.5f - x) / rx, v = (yy + 0.5f - y) / ry;
-                if (u * u + v * v <= 1) set(xx, yy, u * u + v * v > 0.6f ? rim : bell);
+        private void tree(int x, int ground, int h, int tint, float light, float overcast, float cover) {
+            int c = land(TREE, tint, light, overcast), white = land(snowy(TREE, 0, cover * 0.8f), tint, light, overcast);
+            for (int k = 0; k < h; k++) {
+                int w = (h - k) / 2;
+                for (int dx = -w; dx <= w; dx++) set(x + dx, ground - 1 - k, k == h - 1 || dx == -w || dx == w ? white : c);
             }
-            for (int i = -2; i <= 2; i++) for (int k = 1; k < 10 * j[4]; k++) {
-                float tx = x + i * rx * 0.4f + (float) Math.sin(t * 3 + k * 0.5f + i) * 1.1f;
-                blend(Math.round(tx), Math.round(y + k), tent, 1f - k / (10f * j[4]));
+        }
+
+        private void cabin(int x, int ground, int tint, float light, float overcast, float cover, float t) {
+            int wall = land(WALL, tint, light, overcast), roof = land(snowy(ROOF, 0, cover), tint, light, overcast);
+            for (int dy = 1; dy <= 3; dy++) for (int dx = -3; dx <= 3; dx++) set(x + dx, ground - dy, wall);
+            for (int dy = 0; dy < 3; dy++) for (int dx = -4 + dy; dx <= 4 - dy; dx++) set(x + dx, ground - 4 - dy, roof);
+            set(x + 2, ground - 7, land(WALL, tint, light, overcast));   // chimney
+            boolean lit = light < 0.7f;
+            set(x - 1, ground - 2, lit ? rgb(0xFFD27A) : rgb(0x2A2A2A));
+            set(x + 1, ground - 2, lit ? rgb(0xFFD27A) : rgb(0x2A2A2A));
+            if (lit || cover > 0.3f) for (int i = 0; i < 4; i++) {   // smoke when it is dark or cold
+                float age = wrap(t * 0.6f + i * 0.25f, 1f);
+                blend(Math.round(x + 2 + (float) Math.sin(t + i) * age * 2), Math.round(ground - 8 - age * 6), rgb(0xB8BEC8), 0.5f * (1 - age));
             }
+        }
+
+        /** A storm's flash: about every nine seconds, brightness 0..1. */
+        private static float lightning(float t) {
+            float p = wrap(t + 4, 8.7f) / 8.7f;
+            return p < 0.03f ? 1f : p > 0.05f && p < 0.07f ? 0.7f : 0f;
+        }
+
+        private void bolt(float t) {
+            Random r = new Random((long) ((t + 4) / 8.7f));
+            int x = 20 + r.nextInt(W - 40), y = 8;
+            while (y < far[Math.max(0, Math.min(W - 1, x))]) { set(x, y, rgb(0xFFFDE7)); y++; x += r.nextInt(3) - 1; }
+        }
+
+        private static float hash(int n) {
+            n = (n << 13) ^ n;
+            return ((n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff) / (float) 0x7fffffff;
         }
     }
 }

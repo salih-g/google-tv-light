@@ -115,6 +115,7 @@ public class MainActivity extends Activity {
         Context app = getApplicationContext();
         Wallpapers.sun = t -> Sky.slot(app, t);   // real sunrise/sunset once the weather has been fetched
         Live.phase = t -> Sky.phase(app, t);
+        Live.weather = () -> Sky.temperature(app) == null ? -1 : Sky.code(app);
         buildUi();
         setContentView(root);
         int w = getResources().getDisplayMetrics().widthPixels, h = getResources().getDisplayMetrics().heightPixels;
